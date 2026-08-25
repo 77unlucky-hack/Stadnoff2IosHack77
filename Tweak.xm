@@ -16,7 +16,7 @@ static BOOL espDistance = NO;
 static BOOL espSkeleton = NO;
 static BOOL aimEnabled = NO;
 static BOOL aimTargetHead = YES;
-static CGFloat aimFOV = 100.0;
+static float aimFOV = 100.0f;
 static BOOL menuVisible = NO;
 
 // ==================== IL2CPP ====================
@@ -208,7 +208,7 @@ static void updatePlayers() {
     ImGui::TextColored(ImVec4(0,1,1,1), "Aim");
     ImGui::Checkbox("Enable", &aimEnabled);
     ImGui::Checkbox("Head", &aimTargetHead);
-    ImGui::SliderFloat("FOV", &aimFOV, 50, 300);
+    ImGui::SliderFloat("FOV", &aimFOV, 0.0f, 380.0f);
     
     ImGui::End();
     
