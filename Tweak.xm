@@ -115,6 +115,17 @@ static void updatePlayers() {
     }
 }
 
+// ==================== Handler ====================
+@interface Handler : NSObject
++ (void)toggleMenu;
+@end
+
+@implementation Handler
++ (void)toggleMenu {
+    menuVisible = !menuVisible;
+}
+@end
+
 // ==================== ImGui View ====================
 @interface ImGuiDrawView : UIViewController <MTKViewDelegate>
 @property (nonatomic, strong) id<MTLDevice> device;
@@ -154,7 +165,6 @@ static void updatePlayers() {
     ImGui_ImplMetal_NewFrame(view.currentRenderPassDescriptor);
     ImGui::NewFrame();
     
-    // ESP
     if (espEnabled) {
         ImDrawList *draw = ImGui::GetForegroundDrawList();
         for (NSDictionary *p in screenPlayers) {
@@ -182,7 +192,6 @@ static void updatePlayers() {
         }
     }
     
-    // Меню
     ImGui::Begin("Lucky 77", &menuVisible, ImGuiWindowFlags_AlwaysAutoResize);
     
     ImGui::TextColored(ImVec4(1,0,0,1), "Lucky 77 v1.0");
@@ -233,8 +242,7 @@ static void updatePlayers() {
             [win addSubview:vc.view];
             [win bringSubviewToFront:vc.view];
             
-            // Жест — три пальца три тапа
-            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(toggleMenu)];
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:[Handler class] action:@selector(toggleMenu)];
             tap.numberOfTouchesRequired = 3;
             tap.numberOfTapsRequired = 3;
             tap.cancelsTouchesInView = NO;
@@ -246,8 +254,3 @@ static void updatePlayers() {
         } @catch (NSException *e) {}
     });
 }
-
-- (void)toggleMenu {
-    menuVisible = !menuVisible;
-}
-%end
