@@ -1,0 +1,9 @@
+Package: com.lucky77.cheat
+Name: Lucky 77
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Lucky 77
+Maintainer: Lucky77
+Author: Lucky77
+Section: Tweaks
+Depends: mobilesubstrate
