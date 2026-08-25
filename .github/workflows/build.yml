@@ -1,0 +1,23 @@
+name: Build
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Theos
+        run: |
+          git clone --recursive https://github.com/theos/theos.git
+          echo "THEOS=$PWD/theos" >> $GITHUB_ENV
+      - name: Install
+        run: brew install ldid dpkg make
+      - name: Build
+        run: |
+          export THEOS=$PWD/theos
+          make
+          find . -name "*.dylib" -type f
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: lucky77
+          path: .theos/obj/debug/lucky77.dylib
