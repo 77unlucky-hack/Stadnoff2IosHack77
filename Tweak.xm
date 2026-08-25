@@ -15,7 +15,9 @@ static BOOL espLine = NO;
 static BOOL espDistance = NO;
 static BOOL espSkeleton = NO;
 static BOOL aimEnabled = NO;
+static BOOL aimTargetHead = YES;
 static CGFloat aimFOV = 100.0;
+static BOOL menuVisible = NO;
 
 // ==================== IL2CPP ====================
 static void* (*FindObjectsOfType)(void*) = NULL;
@@ -133,15 +135,26 @@ static void updatePlayers() {
     
     ImGui::CreateContext();
     ImGui_ImplMetal_Init(self.device);
+    
+    ImGuiStyle &style = ImGui::GetStyle();
+    style.WindowRounding = 8;
+    style.FrameRounding = 4;
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.05f, 0.05f, 0.05f, 0.95f);
+    style.Colors[ImGuiCol_CheckMark] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+    style.Colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+    style.Colors[ImGuiCol_Button] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 }
 
 - (void)drawInMTKView:(MTKView *)view {
+    if (!menuVisible) return;
+    
     ImGuiIO &io = ImGui::GetIO();
     io.DisplaySize = ImVec2(view.bounds.size.width, view.bounds.size.height);
     
     ImGui_ImplMetal_NewFrame(view.currentRenderPassDescriptor);
     ImGui::NewFrame();
     
+    // ESP
     if (espEnabled) {
         ImDrawList *draw = ImGui::GetForegroundDrawList();
         for (NSDictionary *p in screenPlayers) {
@@ -161,17 +174,33 @@ static void updatePlayers() {
                 snprintf(buf, 32, "[%.0fM]", z);
                 draw->AddText(ImVec2(x-20, y-30), IM_COL32(255,255,255,255), buf);
             }
+            if (espSkeleton) {
+                float headR = 1400/z * 0.18f;
+                draw->AddCircle(ImVec2(x, y-5000/z+headR), headR, IM_COL32(255,255,255,255));
+                draw->AddLine(ImVec2(x, y-5000/z+headR*2), ImVec2(x, y-5000/z+5000/z*0.2f), IM_COL32(255,255,255,255));
+            }
         }
     }
     
-    ImGui::Begin("Settings", NULL, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::Checkbox("ESP", &espEnabled);
+    // Меню
+    ImGui::Begin("Lucky 77", &menuVisible, ImGuiWindowFlags_AlwaysAutoResize);
+    
+    ImGui::TextColored(ImVec4(1,0,0,1), "Lucky 77 v1.0");
+    ImGui::Separator();
+    
+    ImGui::TextColored(ImVec4(0,1,0,1), "ESP");
+    ImGui::Checkbox("Enable", &espEnabled);
     ImGui::Checkbox("Box", &espBox);
     ImGui::Checkbox("Line", &espLine);
     ImGui::Checkbox("Distance", &espDistance);
     ImGui::Checkbox("Skeleton", &espSkeleton);
-    ImGui::Checkbox("Aim", &aimEnabled);
+    
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0,1,1,1), "Aim");
+    ImGui::Checkbox("Enable", &aimEnabled);
+    ImGui::Checkbox("Head", &aimTargetHead);
     ImGui::SliderFloat("FOV", &aimFOV, 50, 300);
+    
     ImGui::End();
     
     ImGui::Render();
@@ -204,9 +233,21 @@ static void updatePlayers() {
             [win addSubview:vc.view];
             [win bringSubviewToFront:vc.view];
             
+            // Жест — три пальца три тапа
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(toggleMenu)];
+            tap.numberOfTouchesRequired = 3;
+            tap.numberOfTapsRequired = 3;
+            tap.cancelsTouchesInView = NO;
+            [win addGestureRecognizer:tap];
+            
             [NSTimer scheduledTimerWithTimeInterval:0.05 repeats:YES block:^(NSTimer *t) {
                 updatePlayers();
             }];
         } @catch (NSException *e) {}
     });
 }
+
+- (void)toggleMenu {
+    menuVisible = !menuVisible;
+}
+%end
