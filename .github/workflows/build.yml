@@ -26,18 +26,51 @@ jobs:
         export PATH=$THEOS/bin:$PATH
         
         # Проверяем, что logos доступен
-        which logos
-        logos --version || true
+        echo "🔍 Checking logos..."
+        ls -la $THEOS/bin/ || true
+        which logos || true
+        
+        # Если logos не найден в bin, пробуем найти в vendor/logos
+        if [ ! -f "$THEOS/bin/logos" ]; then
+          echo "logos not found in bin, trying vendor/logos..."
+          export LOGOS_PATH="$THEOS/vendor/logos/bin/logos"
+          if [ -f "$LOGOS_PATH" ]; then
+            echo "✅ Found logos at $LOGOS_PATH"
+            chmod +x "$LOGOS_PATH"
+            alias logos="$LOGOS_PATH"
+          else
+            echo "❌ logos not found!"
+            exit 1
+          fi
+        fi
         
         # Проверяем, что файл Tweak.xm существует
-        ls -la Tweak.xm
+        echo "🔍 Checking Tweak.xm..."
+        ls -la Tweak.xm || exit 1
         
         # Преобразуем Tweak.xm в Tweak.mm
-        logos Tweak.xm > Tweak.mm
-        echo "✅ Tweak.mm created"
-        ls -la Tweak.mm
+        echo "🔨 Converting Tweak.xm to Tweak.mm..."
+        $THEOS/bin/logos Tweak.xm > Tweak.mm 2>&1 || {
+          echo "❌ logos conversion failed!"
+          # Пробуем альтернативный путь
+          if [ -f "$THEOS/vendor/logos/bin/logos" ]; then
+            echo "🔄 Trying alternative logos path..."
+            $THEOS/vendor/logos/bin/logos Tweak.xm > Tweak.mm
+          else
+            exit 1
+          fi
+        }
+        
+        if [ -f "Tweak.mm" ]; then
+          echo "✅ Tweak.mm created successfully!"
+          head -n 10 Tweak.mm
+        else
+          echo "❌ Tweak.mm was not created!"
+          exit 1
+        fi
         
         # Собираем .dylib через clang
+        echo "🔨 Building .dylib..."
         SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
         CLANG="$(xcrun --find clang)"
         mkdir -p build
