@@ -1,6 +1,5 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
-#import <substrate.h>
 
 // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============
 BOOL g_espEnabled = NO;
@@ -17,9 +16,7 @@ static void PlayToggleSound(BOOL isOn) {
     @try {
         SystemSoundID soundID = isOn ? 1103 : 1104;
         AudioServicesPlaySystemSound(soundID);
-    } @catch (NSException *exception) {
-        // Игнорируем ошибки звука
-    }
+    } @catch (NSException *exception) {}
 }
 
 // ============ ЛОКАЛИЗАЦИЯ ============
@@ -536,7 +533,7 @@ static NSString* L(NSString *key) {
     return container;
 }
 
-// ============ ИНТРО С ЛОГОТИПОМ ============
+// ============ ИНТРО ============
 - (void)buildIntroView {
     self.introView = [UIView new];
     self.introView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -599,12 +596,10 @@ static NSString* L(NSString *key) {
         [self.logoView.topAnchor constraintEqualToAnchor:self.introView.topAnchor constant:20],
         [self.logoView.widthAnchor constraintEqualToConstant:120],
         [self.logoView.heightAnchor constraintEqualToConstant:120],
-        
         [self.bigLogo.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
         [self.bigLogo.topAnchor constraintEqualToAnchor:self.introView.topAnchor constant:20],
         [self.bigLogo.widthAnchor constraintEqualToConstant:120],
         [self.bigLogo.heightAnchor constraintEqualToConstant:120],
-        
         [self.titleLabel.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
         [self.titleLabel.topAnchor constraintEqualToAnchor:self.logoView.bottomAnchor constant:16],
         [self.versionLabel.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
@@ -638,14 +633,12 @@ static NSString* L(NSString *key) {
                     self.logoView.backgroundColor = [UIColor clearColor];
                     self.logoLoaded = YES;
                     self.bigLogo.hidden = YES;
-                    NSLog(@"[Lucky77] Logo loaded successfully! Size: %.0fx%.0f", image.size.width, image.size.height);
+                    NSLog(@"[Lucky77] Logo loaded successfully!");
                 });
             } else {
-                NSLog(@"[Lucky77] Failed to create image from data");
                 [self showFallbackLogo];
             }
         } else {
-            NSLog(@"[Lucky77] No data received");
             [self showFallbackLogo];
         }
     }];
@@ -656,7 +649,6 @@ static NSString* L(NSString *key) {
     dispatch_async(dispatch_get_main_queue(), ^{
         self.logoView.hidden = YES;
         self.bigLogo.hidden = NO;
-        NSLog(@"[Lucky77] Showing fallback logo (⚡)");
     });
 }
 
@@ -802,12 +794,10 @@ static NSString* L(NSString *key) {
 
 @end
 
-// ============ ТОЧКА ВХОДА ТВИКА (ИСПРАВЛЕННАЯ) ============
+// ============ ТОЧКА ВХОДА ТВИКА ============
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
-        
-        // Современный способ для iOS 13+
         if (@available(iOS 13.0, *)) {
             for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
                 if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState == UISceneActivationStateForegroundActive) {
@@ -821,23 +811,18 @@ static NSString* L(NSString *key) {
                 }
             }
         }
-        
-        // Fallback для старых версий
         if (!window) {
             #pragma clang diagnostic push
             #pragma clang diagnostic ignored "-Wdeprecated-declarations"
             window = [UIApplication sharedApplication].keyWindow;
             #pragma clang diagnostic pop
         }
-        
-        // Если всё ещё nil — берём первый попавшийся
         if (!window) {
             #pragma clang diagnostic push
             #pragma clang diagnostic ignored "-Wdeprecated-declarations"
             window = [UIApplication sharedApplication].windows.firstObject;
             #pragma clang diagnostic pop
         }
-        
         UIViewController *root = window.rootViewController;
         if (root) {
             L77MenuViewController *menuVC = [L77MenuViewController new];
