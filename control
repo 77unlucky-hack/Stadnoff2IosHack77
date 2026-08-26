@@ -1,9 +1,9 @@
-Package: com.lucky77.cheat
-Name: Lucky 77
-Version: 1.0.0
+Package: com.77unlucky.lucky77
+Name: Lucky77
+Version: 0.1
 Architecture: iphoneos-arm
-Description: Lucky 77
-Maintainer: Lucky77
-Author: Lucky77
+Description: Standoff 2 cheat menu
+Maintainer: hack77ios
+Author: hack77ios
 Section: Tweaks
-Depends: mobilesubstrate
+Depends: mobilesubstrate (>= 0.9.5000)
