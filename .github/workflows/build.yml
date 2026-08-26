@@ -18,13 +18,24 @@ jobs:
         sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
         xcodebuild -version
         
-    - name: Build dylib
+    - name: Install THEOS
       run: |
-        chmod +x build_dylib.sh
-        ./build_dylib.sh
+        git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+        echo "$HOME/theos/bin" >> $GITHUB_PATH
         
-    - name: Upload artifact
+    - name: Install dependencies
+      run: |
+        brew install ldid dpkg
+        
+    - name: Build tweak
+      run: |
+        export THEOS=$HOME/theos
+        make clean
+        make package
+        
+    - name: Upload .deb
       uses: actions/upload-artifact@v4
       with:
-        name: Lucky77.dylib
-        path: build/Lucky77.dylib
+        name: Lucky77.deb
+        path: packages/*.deb
