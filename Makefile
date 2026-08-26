@@ -1,12 +1,11 @@
-TARGET := iphone:clang
-ARCHS = arm64 arm64e
+TARGET := iphone:clang:latest:15.0
+INSTALL_TARGET_PROCESSES = Standoff2
 
 include $(THEOS)/makefiles/common.mk
 
-LIBRARY_NAME = libobjc_debug
-libobjc_debug_FILES = Tweak.xm ImGui/imgui.cpp ImGui/imgui_draw.cpp ImGui/imgui_widgets.cpp ImGui/imgui_tables.cpp ImGui/imgui_impl_metal.mm
-libobjc_debug_FRAMEWORKS = UIKit Foundation CoreGraphics QuartzCore Metal MetalKit
-libobjc_debug_CFLAGS = -fobjc-arc -I./ImGui
-libobjc_debug_INSTALL_PATH = @executable_path/Frameworks
+TWEAK_NAME = Lucky77
+Lucky77_FILES = Tweak.xm
+Lucky77_CFLAGS = -fobjc-arc
+Lucky77_FRAMEWORKS = UIKit AudioToolbox QuartzCore
 
-include $(THEOS_MAKE_PATH)/library.mk
+include $(THEOS_MAKE_PATH)/tweak.mk
