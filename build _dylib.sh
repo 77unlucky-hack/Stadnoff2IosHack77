@@ -12,6 +12,7 @@ mkdir -p build
 
 "$CLANG" \
   -fobjc-arc \
+  -fobjc-weak \
   -isysroot "$SDK" \
   -miphoneos-version-min=$MIN_VERSION \
   -arch $ARCH \
