@@ -174,6 +174,7 @@ static NSString* L(NSString *key) {
 @property (nonatomic, assign) BOOL logoLoaded;
 @end
 
+// ============ ВСЯ ЛОГИКА МЕНЮ ============
 @implementation L77MenuViewController
 
 - (void)viewDidLoad {
@@ -181,6 +182,7 @@ static NSString* L(NSString *key) {
     
     self.view.backgroundColor = [UIColor clearColor];
     self.view.opaque = NO;
+    self.view.userInteractionEnabled = NO;
     self.modalPresentationStyle = UIModalPresentationOverFullScreen;
     self.firstOpen = YES;
     self.logoLoaded = NO;
@@ -794,8 +796,9 @@ static NSString* L(NSString *key) {
 
 @end
 
-// ============ ТОЧКА ВХОДА ТВИКА ============
+// ============ ТОЧКА ВХОДА ДЛЯ TWEAK (.xm) ============
 %ctor {
+    // Этот код выполняется при загрузке твика (аналог __attribute__((constructor)))
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
         if (@available(iOS 13.0, *)) {
