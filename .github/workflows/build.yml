@@ -28,14 +28,30 @@ jobs:
       run: |
         brew install ldid dpkg
         
-    - name: Build tweak
+    - name: Build dylib
       run: |
         export THEOS=$HOME/theos
-        make clean
-        make package
+        # Преобразуем Tweak.xm в Tweak.mm
+        $THEOS/bin/logos Tweak.xm > Tweak.mm
+        # Собираем .dylib через clang
+        SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+        CLANG="$(xcrun --find clang)"
+        mkdir -p build
+        $CLANG \
+          -fobjc-arc \
+          -isysroot "$SDK" \
+          -miphoneos-version-min=15.0 \
+          -arch arm64 \
+          -dynamiclib \
+          -framework UIKit \
+          -framework AudioToolbox \
+          -framework QuartzCore \
+          Tweak.mm \
+          -o build/Lucky77.dylib
+        echo "✅ Built: build/Lucky77.dylib"
         
-    - name: Upload .deb
+    - name: Upload .dylib
       uses: actions/upload-artifact@v4
       with:
-        name: Lucky77.deb
-        path: packages/*.deb
+        name: Lucky77.dylib
+        path: build/Lucky77.dylib
