@@ -18,28 +18,30 @@ jobs:
         sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
         xcodebuild -version
         
-    - name: Install THEOS
-      run: |
-        # Устанавливаем THEOS в правильную папку
-        git clone --recursive https://github.com/theos/theos.git $HOME/theos
-        echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-        echo "$HOME/theos/bin" >> $GITHUB_PATH
-        # Проверяем, что logos установлен
-        ls -la $HOME/theos/bin/
-        
     - name: Build dylib
       run: |
+        # Устанавливаем THEOS
+        git clone --recursive --depth=1 https://github.com/theos/theos.git $HOME/theos
         export THEOS=$HOME/theos
+        export PATH=$THEOS/bin:$PATH
+        
+        # Проверяем, что logos доступен
+        which logos
+        logos --version || true
+        
         # Проверяем, что файл Tweak.xm существует
-        ls -la
+        ls -la Tweak.xm
+        
         # Преобразуем Tweak.xm в Tweak.mm
-        $THEOS/bin/logos Tweak.xm > Tweak.mm
-        # Проверяем, что Tweak.mm создан
+        logos Tweak.xm > Tweak.mm
+        echo "✅ Tweak.mm created"
         ls -la Tweak.mm
+        
         # Собираем .dylib через clang
         SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
         CLANG="$(xcrun --find clang)"
         mkdir -p build
+        
         $CLANG \
           -fobjc-arc \
           -fobjc-weak \
@@ -59,7 +61,15 @@ jobs:
           -ldl \
           Tweak.mm \
           -o build/Lucky77.dylib
-        echo "✅ Built: build/Lucky77.dylib"
+        
+        if [ -f "build/Lucky77.dylib" ]; then
+          echo "✅ Built: build/Lucky77.dylib"
+          file build/Lucky77.dylib
+          ls -la build/
+        else
+          echo "❌ Build failed!"
+          exit 1
+        fi
         
     - name: Upload .dylib
       uses: actions/upload-artifact@v4
