@@ -152,9 +152,19 @@ static NSString* L(NSString *key) {
 
 @end
 
-// ============ ГЛАВНОЕ МЕНЮ ============
+// ============ ГЛАВНЫЙ КОНТРОЛЛЕР ============
 @interface L77MenuViewController : UIViewController
 @property (nonatomic, strong) UIView *menuCard;
+@property (nonatomic, strong) UIView *introView;
+@property (nonatomic, strong) UIImageView *logoView;
+@property (nonatomic, strong) UILabel *bigLogo;
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UILabel *versionLabel;
+@property (nonatomic, strong) UILabel *fpsLabel;
+@property (nonatomic, strong) CADisplayLink *displayLink;
+@property (nonatomic, assign) CFTimeInterval lastTimestamp;
+@property (nonatomic, assign) NSInteger frameCount;
+@property (nonatomic, strong) UIStackView *contentStack;
 @property (nonatomic, strong) UIButton *launcherButton;
 @property (nonatomic, assign) BOOL isDragging;
 @property (nonatomic, assign) CGPoint dragOffset;
@@ -163,11 +173,8 @@ static NSString* L(NSString *key) {
 @property (nonatomic, strong) UIScrollView *sidebarScroll;
 @property (nonatomic, strong) UIStackView *navStack;
 @property (nonatomic, strong) NSArray *navButtons;
-@property (nonatomic, strong) UIStackView *contentStack;
-@property (nonatomic, strong) UILabel *fpsLabel;
-@property (nonatomic, strong) CADisplayLink *displayLink;
-@property (nonatomic, assign) CFTimeInterval lastTimestamp;
-@property (nonatomic, assign) NSInteger frameCount;
+@property (nonatomic, assign) BOOL firstOpen;
+@property (nonatomic, assign) BOOL logoLoaded;
 @end
 
 @implementation L77MenuViewController
@@ -179,12 +186,15 @@ static NSString* L(NSString *key) {
     self.view.backgroundColor = [UIColor clearColor];
     self.view.opaque = NO;
     self.modalPresentationStyle = UIModalPresentationOverFullScreen;
+    self.firstOpen = YES;
+    self.logoLoaded = NO;
     
     self.config = [NSMutableDictionary dictionary];
     [self loadConfig];
     
     [self buildLauncherButton];
     [self buildMenu];
+    [self buildIntroView];
     [self startFPS];
 }
 
@@ -530,15 +540,175 @@ static NSString* L(NSString *key) {
     return container;
 }
 
+// ============ ИНТРО С ЛОГОТИПОМ ============
+- (void)buildIntroView {
+    self.introView = [UIView new];
+    self.introView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.introView.backgroundColor = [[UIColor colorWithRed:0.025 green:0.025 blue:0.045 alpha:1.0] colorWithAlphaComponent:0.95];
+    self.introView.layer.cornerRadius = 20;
+    self.introView.userInteractionEnabled = NO;
+    self.introView.hidden = YES;
+    [self.view addSubview:self.introView];
+    
+    [NSLayoutConstraint activateConstraints:@[
+        [self.introView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.introView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+        [self.introView.widthAnchor constraintEqualToConstant:280],
+        [self.introView.heightAnchor constraintEqualToConstant:260],
+    ]];
+    
+    // ============ ЛОГОТИП (ПОВЕРХ ВСЕГО) ============
+    self.logoView = [UIImageView new];
+    self.logoView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.logoView.contentMode = UIViewContentModeScaleAspectFit;
+    self.logoView.layer.cornerRadius = 20;
+    self.logoView.clipsToBounds = YES;
+    self.logoView.backgroundColor = [UIColor clearColor];
+    [self.introView addSubview:self.logoView];
+    
+    // ============ ЗАГРУЗКА ЛОГОТИПА ============
+    [self loadLogo];
+    
+    // ============ БОЛЬШАЯ МОЛНИЯ (ЗАПАСНОЙ ВАРИАНТ) ============
+    self.bigLogo = [UILabel new];
+    self.bigLogo.translatesAutoresizingMaskIntoConstraints = NO;
+    self.bigLogo.text = @"⚡";
+    self.bigLogo.font = [UIFont systemFontOfSize:80 weight:UIFontWeightBold];
+    self.bigLogo.textColor = [UIColor colorWithRed:0.73 green:0.36 blue:1.0 alpha:1.0];
+    self.bigLogo.textAlignment = NSTextAlignmentCenter;
+    self.bigLogo.layer.shadowColor = [UIColor colorWithRed:0.73 green:0.36 blue:1.0 alpha:1.0].CGColor;
+    self.bigLogo.layer.shadowOpacity = 0.9;
+    self.bigLogo.layer.shadowRadius = 30;
+    self.bigLogo.hidden = YES;
+    [self.introView addSubview:self.bigLogo];
+    
+    // ============ НАЗВАНИЕ ============
+    self.titleLabel = [UILabel new];
+    self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.titleLabel.text = @"Lucky77";
+    self.titleLabel.font = [UIFont systemFontOfSize:36 weight:UIFontWeightBold];
+    self.titleLabel.textColor = [UIColor colorWithRed:0.73 green:0.36 blue:1.0 alpha:1.0];
+    self.titleLabel.textAlignment = NSTextAlignmentCenter;
+    self.titleLabel.layer.shadowColor = [UIColor colorWithRed:0.73 green:0.36 blue:1.0 alpha:1.0].CGColor;
+    self.titleLabel.layer.shadowOpacity = 0.8;
+    self.titleLabel.layer.shadowRadius = 20;
+    [self.introView addSubview:self.titleLabel];
+    
+    // ============ ВЕРСИЯ ============
+    self.versionLabel = [UILabel new];
+    self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.versionLabel.text = @"v0.1";
+    self.versionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    self.versionLabel.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
+    self.versionLabel.textAlignment = NSTextAlignmentCenter;
+    [self.introView addSubview:self.versionLabel];
+    
+    [NSLayoutConstraint activateConstraints:@[
+        [self.logoView.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
+        [self.logoView.topAnchor constraintEqualToAnchor:self.introView.topAnchor constant:20],
+        [self.logoView.widthAnchor constraintEqualToConstant:120],
+        [self.logoView.heightAnchor constraintEqualToConstant:120],
+        
+        [self.bigLogo.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
+        [self.bigLogo.topAnchor constraintEqualToAnchor:self.introView.topAnchor constant:20],
+        [self.bigLogo.widthAnchor constraintEqualToConstant:120],
+        [self.bigLogo.heightAnchor constraintEqualToConstant:120],
+        
+        [self.titleLabel.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
+        [self.titleLabel.topAnchor constraintEqualToAnchor:self.logoView.bottomAnchor constant:16],
+        [self.versionLabel.centerXAnchor constraintEqualToAnchor:self.introView.centerXAnchor],
+        [self.versionLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:4],
+    ]];
+}
+
+// ============ ЗАГРУЗКА ЛОГОТИПА (ПРАВИЛЬНАЯ ССЫЛКА) ============
+- (void)loadLogo {
+    // Правильная ссылка на логотип в репозитории Stadnoff2IosHack77
+    NSString *logoURL = @"https://raw.githubusercontent.com/77unlucky-hack/Stadnoff2IosHack77/main/logo.png";
+    NSURL *url = [NSURL URLWithString:logoURL];
+    NSLog(@"[Lucky77] Loading logo from: %@", logoURL);
+    
+    NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+    config.timeoutIntervalForRequest = 10.0;
+    config.timeoutIntervalForResource = 15.0;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:config];
+    
+    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            NSLog(@"[Lucky77] Logo download error: %@", error.localizedDescription);
+            [self showFallbackLogo];
+            return;
+        }
+        
+        if (data && data.length > 0) {
+            UIImage *image = [UIImage imageWithData:data];
+            if (image) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    self.logoView.image = image;
+                    self.logoView.backgroundColor = [UIColor clearColor];
+                    self.logoLoaded = YES;
+                    self.bigLogo.hidden = YES;
+                    NSLog(@"[Lucky77] Logo loaded successfully! Size: %.0fx%.0f", image.size.width, image.size.height);
+                });
+            } else {
+                NSLog(@"[Lucky77] Failed to create image from data");
+                [self showFallbackLogo];
+            }
+        } else {
+            NSLog(@"[Lucky77] No data received");
+            [self showFallbackLogo];
+        }
+    }];
+    [task resume];
+}
+
+- (void)showFallbackLogo {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.logoView.hidden = YES;
+        self.bigLogo.hidden = NO;
+        NSLog(@"[Lucky77] Showing fallback logo (⚡)");
+    });
+}
+
+// ============ ПОКАЗ ИНТРО ============
+- (void)showIntroWithCompletion:(void (^)(void))completion {
+    if (!self.firstOpen) {
+        if (completion) completion();
+        return;
+    }
+    
+    self.firstOpen = NO;
+    self.introView.hidden = NO;
+    self.introView.transform = CGAffineTransformMakeScale(0.5, 0.5);
+    self.introView.alpha = 0;
+    
+    [UIView animateWithDuration:0.8 delay:0.2 usingSpringWithDamping:0.7 initialSpringVelocity:0.5 options:0 animations:^{
+        self.introView.transform = CGAffineTransformIdentity;
+        self.introView.alpha = 1;
+    } completion:^(BOOL finished) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            [UIView animateWithDuration:0.6 animations:^{
+                self.introView.alpha = 0;
+                self.introView.transform = CGAffineTransformMakeScale(1.2, 1.2);
+            } completion:^(BOOL finished2) {
+                self.introView.hidden = YES;
+                if (completion) completion();
+            }];
+        });
+    }];
+}
+
 // ============ УПРАВЛЕНИЕ ============
 - (void)toggleMenu {
     if (self.menuCard.hidden) {
-        self.menuCard.hidden = NO;
-        self.menuCard.alpha = 0;
-        self.launcherButton.hidden = YES;
-        
-        [UIView animateWithDuration:0.2 animations:^{
-            self.menuCard.alpha = 1;
+        [self showIntroWithCompletion:^{
+            self.menuCard.hidden = NO;
+            self.menuCard.alpha = 0;
+            self.launcherButton.hidden = YES;
+            
+            [UIView animateWithDuration:0.2 animations:^{
+                self.menuCard.alpha = 1;
+            }];
         }];
     } else {
         [UIView animateWithDuration:0.15 animations:^{
@@ -644,7 +814,6 @@ static NSString* L(NSString *key) {
 
 // ============ ТОЧКА ВХОДА ТВИКА ============
 %ctor {
-    // Задержка для полной загрузки игры
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
         if (@available(iOS 13.0, *)) {
