@@ -1,29 +1,30 @@
-name: Build
-on: [push, workflow_dispatch]
+name: Build Lucky77
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: macos-latest
+    
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
       
-      - name: Setup Theos
-        run: |
-          git clone --recursive https://github.com/theos/theos.git
-          echo "THEOS=$PWD/theos" >> $GITHUB_ENV
-          
-      - name: Install
-        run: brew install ldid dpkg make
-          
-      - name: Build
-        run: |
-          export THEOS=$PWD/theos
-          make
-          mkdir -p output
-          cp .theos/obj/debug/libobjc_debug.dylib output/
-          ls -la output/
-          
-      - name: Upload dylib
-        uses: actions/upload-artifact@v4
-        with:
-          name: Lucky77
-          path: output/libobjc_debug.dylib
+    - name: Setup Xcode
+      run: |
+        sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+        xcodebuild -version
+        
+    - name: Build dylib
+      run: |
+        chmod +x build_dylib.sh
+        ./build_dylib.sh
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Lucky77.dylib
+        path: build/Lucky77.dylib
