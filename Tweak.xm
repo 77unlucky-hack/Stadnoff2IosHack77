@@ -182,7 +182,6 @@ static NSString* L(NSString *key) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    // Настройки фона
     self.view.backgroundColor = [UIColor clearColor];
     self.view.opaque = NO;
     self.modalPresentationStyle = UIModalPresentationOverFullScreen;
@@ -288,7 +287,6 @@ static NSString* L(NSString *key) {
         [self.menuCard.heightAnchor constraintEqualToConstant:350],
     ]];
     
-    // HEADER
     UIView *header = [UIView new];
     header.translatesAutoresizingMaskIntoConstraints = NO;
     [self.menuCard addSubview:header];
@@ -336,7 +334,6 @@ static NSString* L(NSString *key) {
     divider.backgroundColor = [UIColor colorWithWhite:0.38 alpha:0.35];
     [self.menuCard addSubview:divider];
     
-    // SIDEBAR
     self.sidebarScroll = [UIScrollView new];
     self.sidebarScroll.translatesAutoresizingMaskIntoConstraints = NO;
     self.sidebarScroll.backgroundColor = [[UIColor colorWithRed:0.025 green:0.025 blue:0.045 alpha:1.0] colorWithAlphaComponent:0.5];
@@ -370,7 +367,6 @@ static NSString* L(NSString *key) {
     }
     self.navButtons = buttons;
     
-    // CONTENT
     UIScrollView *scroll = [UIScrollView new];
     scroll.translatesAutoresizingMaskIntoConstraints = NO;
     scroll.showsVerticalScrollIndicator = NO;
@@ -557,7 +553,6 @@ static NSString* L(NSString *key) {
         [self.introView.heightAnchor constraintEqualToConstant:260],
     ]];
     
-    // ============ ЛОГОТИП (ПОВЕРХ ВСЕГО) ============
     self.logoView = [UIImageView new];
     self.logoView.translatesAutoresizingMaskIntoConstraints = NO;
     self.logoView.contentMode = UIViewContentModeScaleAspectFit;
@@ -566,10 +561,8 @@ static NSString* L(NSString *key) {
     self.logoView.backgroundColor = [UIColor clearColor];
     [self.introView addSubview:self.logoView];
     
-    // ============ ЗАГРУЗКА ЛОГОТИПА ============
     [self loadLogo];
     
-    // ============ БОЛЬШАЯ МОЛНИЯ (ЗАПАСНОЙ ВАРИАНТ) ============
     self.bigLogo = [UILabel new];
     self.bigLogo.translatesAutoresizingMaskIntoConstraints = NO;
     self.bigLogo.text = @"⚡";
@@ -582,7 +575,6 @@ static NSString* L(NSString *key) {
     self.bigLogo.hidden = YES;
     [self.introView addSubview:self.bigLogo];
     
-    // ============ НАЗВАНИЕ ============
     self.titleLabel = [UILabel new];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.text = @"Lucky77";
@@ -594,7 +586,6 @@ static NSString* L(NSString *key) {
     self.titleLabel.layer.shadowRadius = 20;
     [self.introView addSubview:self.titleLabel];
     
-    // ============ ВЕРСИЯ ============
     self.versionLabel = [UILabel new];
     self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.versionLabel.text = @"v0.1";
@@ -621,9 +612,8 @@ static NSString* L(NSString *key) {
     ]];
 }
 
-// ============ ЗАГРУЗКА ЛОГОТИПА (ПРАВИЛЬНАЯ ССЫЛКА) ============
+// ============ ЗАГРУЗКА ЛОГОТИПА ============
 - (void)loadLogo {
-    // Правильная ссылка на логотип в репозитории Stadnoff2IosHack77
     NSString *logoURL = @"https://raw.githubusercontent.com/77unlucky-hack/Stadnoff2IosHack77/main/logo.png";
     NSURL *url = [NSURL URLWithString:logoURL];
     NSLog(@"[Lucky77] Loading logo from: %@", logoURL);
@@ -812,10 +802,12 @@ static NSString* L(NSString *key) {
 
 @end
 
-// ============ ТОЧКА ВХОДА ТВИКА ============
+// ============ ТОЧКА ВХОДА ТВИКА (ИСПРАВЛЕННАЯ) ============
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
+        
+        // Современный способ для iOS 13+
         if (@available(iOS 13.0, *)) {
             for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
                 if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState == UISceneActivationStateForegroundActive) {
@@ -829,9 +821,23 @@ static NSString* L(NSString *key) {
                 }
             }
         }
+        
+        // Fallback для старых версий
         if (!window) {
-            window = [UIApplication sharedApplication].windows.firstObject;
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            window = [UIApplication sharedApplication].keyWindow;
+            #pragma clang diagnostic pop
         }
+        
+        // Если всё ещё nil — берём первый попавшийся
+        if (!window) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+            window = [UIApplication sharedApplication].windows.firstObject;
+            #pragma clang diagnostic pop
+        }
+        
         UIViewController *root = window.rootViewController;
         if (root) {
             L77MenuViewController *menuVC = [L77MenuViewController new];
