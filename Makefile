@@ -1,5 +1,6 @@
 TARGET := iphone:clang:latest:15.0
 INSTALL_TARGET_PROCESSES = Standoff2
+DEBUG = 0
 
 include $(THEOS)/makefiles/common.mk
 
