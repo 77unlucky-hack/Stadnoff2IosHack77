@@ -25,45 +25,18 @@ jobs:
         export THEOS=$HOME/theos
         export PATH=$THEOS/bin:$PATH
         
-        # Проверяем, что logos доступен
-        echo "🔍 Checking logos..."
-        ls -la $THEOS/bin/ || true
-        which logos || true
-        
-        # Если logos не найден в bin, пробуем найти в vendor/logos
-        if [ ! -f "$THEOS/bin/logos" ]; then
-          echo "logos not found in bin, trying vendor/logos..."
-          export LOGOS_PATH="$THEOS/vendor/logos/bin/logos"
-          if [ -f "$LOGOS_PATH" ]; then
-            echo "✅ Found logos at $LOGOS_PATH"
-            chmod +x "$LOGOS_PATH"
-            alias logos="$LOGOS_PATH"
-          else
-            echo "❌ logos not found!"
-            exit 1
-          fi
-        fi
-        
         # Проверяем, что файл Tweak.xm существует
         echo "🔍 Checking Tweak.xm..."
         ls -la Tweak.xm || exit 1
         
-        # Преобразуем Tweak.xm в Tweak.mm
-        echo "🔨 Converting Tweak.xm to Tweak.mm..."
-        $THEOS/bin/logos Tweak.xm > Tweak.mm 2>&1 || {
-          echo "❌ logos conversion failed!"
-          # Пробуем альтернативный путь
-          if [ -f "$THEOS/vendor/logos/bin/logos" ]; then
-            echo "🔄 Trying alternative logos path..."
-            $THEOS/vendor/logos/bin/logos Tweak.xm > Tweak.mm
-          else
-            exit 1
-          fi
-        }
+        # Преобразуем Tweak.xm в Tweak.mm через logos.pl (Perl)
+        echo "🔨 Converting Tweak.xm to Tweak.mm using logos.pl..."
+        perl $THEOS/vendor/logos/bin/logos.pl Tweak.xm > Tweak.mm 2>&1
         
         if [ -f "Tweak.mm" ]; then
           echo "✅ Tweak.mm created successfully!"
-          head -n 10 Tweak.mm
+          echo "📄 First 20 lines of Tweak.mm:"
+          head -n 20 Tweak.mm
         else
           echo "❌ Tweak.mm was not created!"
           exit 1
