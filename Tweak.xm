@@ -1,6 +1,5 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
-#import <substrate.h>
 
 // ============ BUNDLE ID ДЛЯ STANDOFF 2 ============
 #define BUNDLE_ID @"com.axelbolt.standof2"
@@ -561,9 +560,8 @@ static UIColor *L77Panel(void) {
 
 @end
 
-// ============ ТОЧКА ВХОДА ДЛЯ TWEAK (.xm) ============
-%ctor {
-    // Ждём полной загрузки игры (5 секунд)
+// ============ ТОЧКА ВХОДА ============
+__attribute__((constructor)) void init() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
         if (@available(iOS 13.0, *)) {
@@ -603,31 +601,3 @@ static UIColor *L77Panel(void) {
         }
     });
 }
-
-// ============ ХУКИ ДЛЯ STANDOFF 2 ============
-// Здесь будут добавляться хуки для функций игры
-// (ESP, Aimbot, No Recoil, Unlimited Ammo и т.д.)
-
-%hook GamePlayer
-
-// Пример хука для бесконечных патронов
-- (int)getAmmo {
-    if (gUnlimitedAmmo) {
-        return 999;
-    }
-    return %orig;
-}
-
-%end
-
-%hook WeaponController
-
-// Пример хука для отключения отдачи
-- (float)getRecoil {
-    if (gNoRecoil) {
-        return 0.0f;
-    }
-    return %orig;
-}
-
-%end
