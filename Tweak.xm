@@ -1,6 +1,9 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 
+// ============ BUNDLE ID ДЛЯ STANDOFF 2 ============
+#define BUNDLE_ID @"com.axelbolt.standoff2"
+
 // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============
 static BOOL gAimbot = NO;
 static BOOL gTriggerbot = NO;
@@ -128,7 +131,7 @@ static UIColor *L77LightPurple(void) {
 
 @end
 
-// ============ ГЛАВНОЕ МЕНЮ (ПЛАВАЮЩЕЕ) ============
+// ============ ГЛАВНОЕ МЕНЮ ============
 @interface Lucky77OverlayView : UIView
 @property(nonatomic,strong) UIView *menu;
 @property(nonatomic,strong) UIView *intro;
@@ -155,7 +158,7 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = YES;
+        self.userInteractionEnabled = NO; // ← НЕ ПЕРЕХВАТЫВАЕМ КАСАНИЯ ПО УМОЛЧАНИЮ
         self.introShown = NO;
         
         [self buildLauncherButton];
@@ -220,7 +223,7 @@ static UIColor *L77LightPurple(void) {
     }
 }
 
-// ============ ПЛАВАЮЩЕЕ МЕНЮ (БОЛЬШОЕ) ============
+// ============ МЕНЮ ============
 - (void)buildMenu {
     self.menu = [UIView new];
     self.menu.translatesAutoresizingMaskIntoConstraints = NO;
@@ -234,18 +237,16 @@ static UIColor *L77LightPurple(void) {
     
     [self addSubview:self.menu];
     
-    // ПЛАВАЮЩЕЕ ОКНО — можно перетаскивать
     self.menuLeadingConstraint = [self.menu.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:40];
     self.menuTopConstraint = [self.menu.topAnchor constraintEqualToAnchor:self.topAnchor constant:60];
     
     [NSLayoutConstraint activateConstraints:@[
         self.menuLeadingConstraint,
         self.menuTopConstraint,
-        [self.menu.widthAnchor constraintEqualToConstant:420],   // ← БОЛЬШЕ
-        [self.menu.heightAnchor constraintEqualToConstant:480]   // ← БОЛЬШЕ
+        [self.menu.widthAnchor constraintEqualToConstant:420],
+        [self.menu.heightAnchor constraintEqualToConstant:480]
     ]];
     
-    // Добавляем жест перетаскивания для всего меню (по заголовку)
     UIPanGestureRecognizer *dragMenu = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragMenu:)];
     [self.menu addGestureRecognizer:dragMenu];
     
@@ -253,7 +254,6 @@ static UIColor *L77LightPurple(void) {
     [self buildBody];
 }
 
-// ============ ПЕРЕТАСКИВАНИЕ МЕНЮ ============
 - (void)dragMenu:(UIPanGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateBegan) {
         self.isDragging = YES;
@@ -261,7 +261,6 @@ static UIColor *L77LightPurple(void) {
         CGPoint translation = [gesture translationInView:self];
         CGFloat newX = self.menuLeadingConstraint.constant + translation.x;
         CGFloat newY = self.menuTopConstraint.constant + translation.y;
-        // Ограничиваем, чтобы меню не выходило за экран
         newX = MAX(0, MIN(newX, self.bounds.size.width - 420));
         newY = MAX(0, MIN(newY, self.bounds.size.height - 480));
         self.menuLeadingConstraint.constant = newX;
@@ -673,6 +672,9 @@ static UIColor *L77LightPurple(void) {
 // ============ УПРАВЛЕНИЕ МЕНЮ ============
 - (void)toggleMenu {
     if (self.menu.hidden) {
+        // Открываем меню — перехватываем касания
+        self.userInteractionEnabled = YES;
+        
         [self showIntroWithCompletion:^{
             self.menu.hidden = NO;
             self.menu.alpha = 0;
@@ -682,13 +684,14 @@ static UIColor *L77LightPurple(void) {
             }];
         }];
     } else {
+        // Закрываем меню — отпускаем касания
         [UIView animateWithDuration:0.18 animations:^{
             self.menu.alpha = 0;
         } completion:^(BOOL finished) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.launcherButton.hidden = NO;
-            self.userInteractionEnabled = YES;
+            self.userInteractionEnabled = NO; // ← ОТПУСКАЕМ КАСАНИЯ
         }];
     }
 }
@@ -709,8 +712,8 @@ static void ShowLucky77Overlay(UIWindow *targetWindow) {
     
     Lucky77OverlayView *overlay = [[Lucky77OverlayView alloc] initWithFrame:targetWindow.bounds];
     overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    overlay.backgroundColor = UIColor.clearColor;
-    overlay.userInteractionEnabled = YES;
+    overlay.backgroundColor = [UIColor clearColor];
+    overlay.userInteractionEnabled = NO; // ← НЕ ПЕРЕХВАТЫВАЕМ КАСАНИЯ
     
     [targetWindow addSubview:overlay];
     [targetWindow bringSubviewToFront:overlay];
