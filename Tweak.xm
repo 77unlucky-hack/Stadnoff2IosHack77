@@ -10,7 +10,6 @@ static BOOL gNoRecoil = NO;
 static BOOL gUnlimitedAmmo = NO;
 static NSInteger gFPSLimit = 60;
 static BOOL gFirstOpen = YES;
-static UIWindow *gLucky77Window = nil; // ← СОХРАНЯЕМ ОКНО
 
 // ============ ЗВУКИ ============
 static void PlayToggleSound(BOOL isOn) {
@@ -127,7 +126,6 @@ static UIColor *L77Border(void) {
 @property(nonatomic,assign) BOOL isDragging;
 @property(nonatomic,assign) CGPoint dragOffset;
 @property(nonatomic,assign) BOOL introShown;
-// Constraints для перетаскивания
 @property(nonatomic,strong) NSLayoutConstraint *leadingConstraint;
 @property(nonatomic,strong) NSLayoutConstraint *topConstraint;
 @end
@@ -138,7 +136,7 @@ static UIColor *L77Border(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
+        self.userInteractionEnabled = YES;
         self.introShown = NO;
         
         [self buildLauncherButton];
@@ -173,7 +171,6 @@ static UIColor *L77Border(void) {
     
     [self addSubview:self.launcherButton];
     
-    // Сохраняем constraints для перетаскивания
     self.leadingConstraint = [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12];
     self.topConstraint = [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:12];
     
@@ -185,7 +182,6 @@ static UIColor *L77Border(void) {
     ]];
     
     [self bringSubviewToFront:self.launcherButton];
-    NSLog(@"[Lucky77] ✅ Launcher button built");
 }
 
 - (void)dragLauncher:(UIPanGestureRecognizer *)gesture {
@@ -195,11 +191,8 @@ static UIColor *L77Border(void) {
         CGPoint translation = [gesture translationInView:self];
         CGFloat newX = self.leadingConstraint.constant + translation.x;
         CGFloat newY = self.topConstraint.constant + translation.y;
-        
-        // Ограничиваем, чтобы кнопка не выходила за экран
         newX = MAX(0, MIN(newX, self.bounds.size.width - 60));
         newY = MAX(0, MIN(newY, self.bounds.size.height - 60));
-        
         self.leadingConstraint.constant = newX;
         self.topConstraint.constant = newY;
         [gesture setTranslation:CGPointZero inView:self];
@@ -279,7 +272,6 @@ static UIColor *L77Border(void) {
         [header.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor],
         [header.topAnchor constraintEqualToAnchor:self.menu.topAnchor],
         [header.heightAnchor constraintEqualToConstant:50],
-        
         [self.fpsLabel.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:14],
         [self.fpsLabel.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
         [title.centerXAnchor constraintEqualToAnchor:header.centerXAnchor constant:-10],
@@ -290,7 +282,6 @@ static UIColor *L77Border(void) {
         [closeBtn.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
         [closeBtn.widthAnchor constraintEqualToConstant:32],
         [closeBtn.heightAnchor constraintEqualToConstant:32],
-        
         [divider.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor],
         [divider.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor],
         [divider.topAnchor constraintEqualToAnchor:header.bottomAnchor],
@@ -349,16 +340,13 @@ static UIColor *L77Border(void) {
         [sidebar.topAnchor constraintEqualToAnchor:self.menu.topAnchor constant:60],
         [sidebar.bottomAnchor constraintEqualToAnchor:self.menu.bottomAnchor constant:-10],
         [sidebar.widthAnchor constraintEqualToConstant:85],
-        
         [self.navStack.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor constant:6],
         [self.navStack.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:-6],
         [self.navStack.topAnchor constraintEqualToAnchor:sidebar.topAnchor constant:10],
-        
         [scroll.leadingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:10],
         [scroll.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor constant:-10],
         [scroll.topAnchor constraintEqualToAnchor:sidebar.topAnchor],
         [scroll.bottomAnchor constraintEqualToAnchor:sidebar.bottomAnchor],
-        
         [self.contentStack.leadingAnchor constraintEqualToAnchor:scroll.leadingAnchor],
         [self.contentStack.trailingAnchor constraintEqualToAnchor:scroll.trailingAnchor],
         [self.contentStack.topAnchor constraintEqualToAnchor:scroll.topAnchor],
@@ -606,7 +594,6 @@ static UIColor *L77Border(void) {
             self.menu.hidden = NO;
             self.menu.alpha = 0;
             self.launcherButton.hidden = YES;
-            
             [UIView animateWithDuration:0.25 animations:^{
                 self.menu.alpha = 1;
             }];
@@ -618,7 +605,6 @@ static UIColor *L77Border(void) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.launcherButton.hidden = NO;
-            // ← НЕ ОТКЛЮЧАЕМ ВЗАИМОДЕЙСТВИЕ
             self.userInteractionEnabled = YES;
         }];
     }
@@ -632,59 +618,57 @@ static UIColor *L77Border(void) {
 @end
 
 // ============ ТОЧКА ВХОДА ============
-static void ShowLucky77Overlay(void) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindowScene *windowScene = nil;
+static void ShowLucky77Overlay(UIWindow *targetWindow) {
+    if (!targetWindow) {
+        NSLog(@"[Lucky77] ❌ Target window is nil");
+        return;
+    }
+    
+    Lucky77OverlayView *overlay = [[Lucky77OverlayView alloc] initWithFrame:targetWindow.bounds];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    overlay.backgroundColor = UIColor.clearColor;
+    overlay.userInteractionEnabled = YES;
+    
+    [targetWindow addSubview:overlay];
+    [targetWindow bringSubviewToFront:overlay];
+    
+    NSLog(@"[Lucky77] ✅ Overlay attached to window: %@", targetWindow);
+}
+
+__attribute__((constructor)) void init() {
+    NSLog(@"[Lucky77] ⏳ init() called");
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        UIWindow *mainWindow = nil;
         
         if (@available(iOS 13.0, *)) {
             for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
                 if ([scene isKindOfClass:UIWindowScene.class] &&
                     scene.activationState == UISceneActivationStateForegroundActive) {
-                    windowScene = (UIWindowScene *)scene;
-                    break;
+                    UIWindowScene *windowScene = (UIWindowScene *)scene;
+                    for (UIWindow *window in windowScene.windows) {
+                        if (window.isKeyWindow) {
+                            mainWindow = window;
+                            break;
+                        }
+                    }
+                    if (mainWindow) break;
                 }
             }
         }
         
-        UIWindow *window;
-        
-        if (@available(iOS 13.0, *)) {
-            if (!windowScene) {
-                NSLog(@"[Lucky77] No active UIWindowScene");
-                return;
-            }
-            window = [[UIWindow alloc] initWithWindowScene:windowScene];
-            window.frame = windowScene.coordinateSpace.bounds;
-        } else {
-            window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+        if (!mainWindow) {
+            mainWindow = UIApplication.sharedApplication.keyWindow;
         }
         
-        window.backgroundColor = UIColor.clearColor;
-        window.windowLevel = UIWindowLevelAlert + 1;
-        window.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
+        if (!mainWindow) {
+            mainWindow = UIApplication.sharedApplication.windows.firstObject;
+        }
         
-        UIViewController *root = [UIViewController new];
-        root.view.backgroundColor = UIColor.clearColor;
-        root.view.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
-        
-        Lucky77OverlayView *overlay = [[Lucky77OverlayView alloc] initWithFrame:window.bounds];
-        overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        overlay.backgroundColor = UIColor.clearColor;
-        overlay.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
-        
-        root.view = overlay;
-        window.rootViewController = root;
-        window.hidden = NO;
-        
-        gLucky77Window = window;
-        
-        NSLog(@"[Lucky77] ✅ Overlay visible");
-    });
-}
-
-__attribute__((constructor)) void init() {
-    NSLog(@"[Lucky77] ⏳ init() called");
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        ShowLucky77Overlay();
+        if (mainWindow) {
+            ShowLucky77Overlay(mainWindow);
+        } else {
+            NSLog(@"[Lucky77] ❌ No window found");
+        }
     });
 }
