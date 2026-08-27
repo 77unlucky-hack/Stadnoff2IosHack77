@@ -158,8 +158,15 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO; // ← НЕ ПЕРЕХВАТЫВАЕМ КАСАНИЯ ПО УМОЛЧАНИЮ
+        self.userInteractionEnabled = NO;
         self.introShown = NO;
+        
+        // ============ ЖЕСТ: ТРОЙНОЕ КАСАНИЕ ТРЕМЯ ПАЛЬЦАМИ ============
+        UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTripleTap:)];
+        tripleTap.numberOfTapsRequired = 3;
+        tripleTap.numberOfTouchesRequired = 3;
+        tripleTap.cancelsTouchesInView = NO;
+        [self addGestureRecognizer:tripleTap];
         
         [self buildLauncherButton];
         [self buildMenu];
@@ -171,6 +178,32 @@ static UIColor *L77LightPurple(void) {
 
 - (void)dealloc {
     [self.displayLink invalidate];
+}
+
+// ============ ОБРАБОТЧИК ТРОЙНОГО КАСАНИЯ ============
+- (void)handleTripleTap:(UITapGestureRecognizer *)gesture {
+    NSLog(@"[Lucky77] 🔥 Triple tap detected!");
+    
+    if (self.menu.hidden) {
+        self.userInteractionEnabled = YES;
+        [self showIntroWithCompletion:^{
+            self.menu.hidden = NO;
+            self.menu.alpha = 0;
+            self.launcherButton.hidden = YES;
+            [UIView animateWithDuration:0.25 animations:^{
+                self.menu.alpha = 1;
+            }];
+        }];
+    } else {
+        [UIView animateWithDuration:0.18 animations:^{
+            self.menu.alpha = 0;
+        } completion:^(BOOL finished) {
+            self.menu.hidden = YES;
+            self.menu.alpha = 1;
+            self.launcherButton.hidden = NO;
+            self.userInteractionEnabled = NO;
+        }];
+    }
 }
 
 // ============ КНОПКА-ЛАУНЧЕР ============
@@ -672,9 +705,7 @@ static UIColor *L77LightPurple(void) {
 // ============ УПРАВЛЕНИЕ МЕНЮ ============
 - (void)toggleMenu {
     if (self.menu.hidden) {
-        // Открываем меню — перехватываем касания
         self.userInteractionEnabled = YES;
-        
         [self showIntroWithCompletion:^{
             self.menu.hidden = NO;
             self.menu.alpha = 0;
@@ -684,14 +715,13 @@ static UIColor *L77LightPurple(void) {
             }];
         }];
     } else {
-        // Закрываем меню — отпускаем касания
         [UIView animateWithDuration:0.18 animations:^{
             self.menu.alpha = 0;
         } completion:^(BOOL finished) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.launcherButton.hidden = NO;
-            self.userInteractionEnabled = NO; // ← ОТПУСКАЕМ КАСАНИЯ
+            self.userInteractionEnabled = NO;
         }];
     }
 }
@@ -713,7 +743,7 @@ static void ShowLucky77Overlay(UIWindow *targetWindow) {
     Lucky77OverlayView *overlay = [[Lucky77OverlayView alloc] initWithFrame:targetWindow.bounds];
     overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlay.backgroundColor = [UIColor clearColor];
-    overlay.userInteractionEnabled = NO; // ← НЕ ПЕРЕХВАТЫВАЕМ КАСАНИЯ
+    overlay.userInteractionEnabled = NO;
     
     [targetWindow addSubview:overlay];
     [targetWindow bringSubviewToFront:overlay];
