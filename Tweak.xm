@@ -76,8 +76,6 @@ static NSString* L(NSString *key) {
             @"loaded": @"✅ Config loaded!",
             @"fail_save": @"❌ Failed to save config",
             @"fail_load": @"❌ Failed to load config",
-            @"aimbot": @"AIMBOT",
-            @"visuals": @"VISUALS",
         };
         ru = @{
             @"settings": @"НАСТРОЙКИ",
@@ -99,8 +97,6 @@ static NSString* L(NSString *key) {
             @"loaded": @"✅ Конфиг загружен!",
             @"fail_save": @"❌ Не удалось сохранить конфиг",
             @"fail_load": @"❌ Не удалось загрузить конфиг",
-            @"aimbot": @"АИМБОТ",
-            @"visuals": @"ВИЗУАЛ",
         };
     });
     return gLanguage == 0 ? en[key] : ru[key];
@@ -408,7 +404,7 @@ static UIColor *L77LightPurple(void) {
     [NSLayoutConstraint activateConstraints:@[
         self.menuLeadingConstraint,
         self.menuTopConstraint,
-        [self.menu.widthAnchor constraintEqualToConstant:420],
+        [self.menu.widthAnchor constraintEqualToConstant:520],
         [self.menu.heightAnchor constraintEqualToConstant:320]
     ]];
     
@@ -423,14 +419,19 @@ static UIColor *L77LightPurple(void) {
 - (void)dragMenu:(UIPanGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateChanged) {
         CGPoint translation = [gesture translationInView:self];
+        
         CGFloat newCenterX = self.menu.center.x + translation.x;
         CGFloat newCenterY = self.menu.center.y + translation.y;
-        CGFloat halfWidth = 420 / 2;
+        
+        CGFloat halfWidth = 520 / 2;
         CGFloat halfHeight = 320 / 2;
+        
         newCenterX = MAX(halfWidth, MIN(newCenterX, self.bounds.size.width - halfWidth));
         newCenterY = MAX(halfHeight + 20, MIN(newCenterY, self.bounds.size.height - halfHeight - 20));
+        
         self.menuLeadingConstraint.constant = newCenterX - self.bounds.size.width / 2;
         self.menuTopConstraint.constant = newCenterY - self.bounds.size.height / 2 - 20;
+        
         [gesture setTranslation:CGPointZero inView:self];
     }
 }
@@ -999,7 +1000,6 @@ static UIColor *L77LightPurple(void) {
 }
 
 - (void)refreshSettingsTab {
-    // Обновляем заголовки вкладок
     NSArray *titles = @[@"AIMBOT", @"VISUALS", @"SETTINGS"];
     for (NSInteger i = 0; i < self.navButtons.count && i < titles.count; i++) {
         UIButton *btn = self.navButtons[i];
