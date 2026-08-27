@@ -153,14 +153,16 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = YES; // ← ВСЕГДА ВКЛЮЧЕНЫ ДЛЯ ЖЕСТА
+        self.userInteractionEnabled = NO; // ← НЕ ПЕРЕХВАТЫВАЕМ КАСАНИЯ
         self.introShown = NO;
         
-        // ============ ЖЕСТ: ТРОЙНОЕ КАСАНИЕ ТРЕМЯ ПАЛЬЦАМИ ============
+        // Жест работает даже при userInteractionEnabled = NO
         UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTripleTap:)];
         tripleTap.numberOfTapsRequired = 3;
         tripleTap.numberOfTouchesRequired = 3;
         tripleTap.cancelsTouchesInView = NO;
+        tripleTap.delaysTouchesBegan = NO;
+        tripleTap.delaysTouchesEnded = NO;
         [self addGestureRecognizer:tripleTap];
         
         [self buildMenu];
@@ -179,23 +181,26 @@ static UIColor *L77LightPurple(void) {
     NSLog(@"[Lucky77] 🔥 Triple tap detected!");
     
     if (self.menu.hidden) {
-        // Открываем меню
+        // Открываем меню — начинаем перехватывать касания
+        self.userInteractionEnabled = YES;
+        
         [self showIntroWithCompletion:^{
             self.menu.hidden = NO;
             self.menu.alpha = 0;
-            self.menu.userInteractionEnabled = YES; // ← Меню перехватывает касания
+            self.menu.userInteractionEnabled = YES;
             [UIView animateWithDuration:0.25 animations:^{
                 self.menu.alpha = 1;
             }];
         }];
     } else {
-        // Закрываем меню
+        // Закрываем меню — отпускаем касания
         [UIView animateWithDuration:0.18 animations:^{
             self.menu.alpha = 0;
         } completion:^(BOOL finished) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
-            self.menu.userInteractionEnabled = NO; // ← Меню НЕ перехватывает касания
+            self.menu.userInteractionEnabled = NO;
+            self.userInteractionEnabled = NO;
         }];
     }
 }
@@ -210,7 +215,7 @@ static UIColor *L77LightPurple(void) {
     self.menu.layer.borderColor = L77Border().CGColor;
     self.menu.clipsToBounds = YES;
     self.menu.hidden = YES;
-    self.menu.userInteractionEnabled = NO; // ← ПО УМОЛЧАНИЮ НЕ ПЕРЕХВАТЫВАЕТ
+    self.menu.userInteractionEnabled = NO;
     
     [self addSubview:self.menu];
     
@@ -224,7 +229,6 @@ static UIColor *L77LightPurple(void) {
         [self.menu.heightAnchor constraintEqualToConstant:480]
     ]];
     
-    // Перетаскивание меню
     UIPanGestureRecognizer *dragMenu = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragMenu:)];
     [self.menu addGestureRecognizer:dragMenu];
     
@@ -318,6 +322,7 @@ static UIColor *L77LightPurple(void) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.menu.userInteractionEnabled = NO;
+            self.userInteractionEnabled = NO;
         }];
     }
 }
