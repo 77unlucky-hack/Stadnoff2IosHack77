@@ -153,16 +153,14 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO; // ← НЕ ПЕРЕХВАТЫВАЕМ КАСАНИЯ
+        self.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ ДЛЯ ЖЕСТА
         self.introShown = NO;
         
-        // Жест работает даже при userInteractionEnabled = NO
+        // ============ УПРОЩЁННЫЙ ЖЕСТ ============
         UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTripleTap:)];
-        tripleTap.numberOfTapsRequired = 3;
-        tripleTap.numberOfTouchesRequired = 3;
+        tripleTap.numberOfTapsRequired = 1;      // ← ОДИН ТАП
+        tripleTap.numberOfTouchesRequired = 3;   // ← ТРЕМЯ ПАЛЬЦАМИ
         tripleTap.cancelsTouchesInView = NO;
-        tripleTap.delaysTouchesBegan = NO;
-        tripleTap.delaysTouchesEnded = NO;
         [self addGestureRecognizer:tripleTap];
         
         [self buildMenu];
@@ -172,18 +170,34 @@ static UIColor *L77LightPurple(void) {
     return self;
 }
 
-- (void)dealloc {
-    [self.displayLink invalidate];
+// ============ ПРОПУСК КАСАНИЙ СКВОЗЬ ОВЕРЛЕЙ ============
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    UIView *hit = [super hitTest:point withEvent:event];
+    
+    // Если меню скрыто и касание пришло на сам оверлей (не на дочерние элементы) — пропускаем
+    if (self.menu.hidden && (hit == self || hit == nil)) {
+        return nil;
+    }
+    
+    // Если меню открыто — проверяем, что касание внутри меню
+    if (!self.menu.hidden) {
+        CGPoint pointInMenu = [self convertPoint:point toView:self.menu];
+        if ([self.menu pointInside:pointInMenu withEvent:event]) {
+            return hit;
+        }
+        // Касание вне меню — пропускаем
+        return nil;
+    }
+    
+    return hit;
 }
 
-// ============ ОБРАБОТЧИК ТРОЙНОГО КАСАНИЯ ============
+// ============ ОБРАБОТЧИК ЖЕСТА ============
 - (void)handleTripleTap:(UITapGestureRecognizer *)gesture {
     NSLog(@"[Lucky77] 🔥 Triple tap detected!");
     
     if (self.menu.hidden) {
-        // Открываем меню — начинаем перехватывать касания
-        self.userInteractionEnabled = YES;
-        
+        // Открываем меню
         [self showIntroWithCompletion:^{
             self.menu.hidden = NO;
             self.menu.alpha = 0;
@@ -193,14 +207,13 @@ static UIColor *L77LightPurple(void) {
             }];
         }];
     } else {
-        // Закрываем меню — отпускаем касания
+        // Закрываем меню
         [UIView animateWithDuration:0.18 animations:^{
             self.menu.alpha = 0;
         } completion:^(BOOL finished) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.menu.userInteractionEnabled = NO;
-            self.userInteractionEnabled = NO;
         }];
     }
 }
@@ -237,9 +250,7 @@ static UIColor *L77LightPurple(void) {
 }
 
 - (void)dragMenu:(UIPanGestureRecognizer *)gesture {
-    if (gesture.state == UIGestureRecognizerStateBegan) {
-        // ничего
-    } else if (gesture.state == UIGestureRecognizerStateChanged) {
+    if (gesture.state == UIGestureRecognizerStateChanged) {
         CGPoint translation = [gesture translationInView:self];
         CGFloat newX = self.menuLeadingConstraint.constant + translation.x;
         CGFloat newY = self.menuTopConstraint.constant + translation.y;
@@ -322,7 +333,6 @@ static UIColor *L77LightPurple(void) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.menu.userInteractionEnabled = NO;
-            self.userInteractionEnabled = NO;
         }];
     }
 }
@@ -542,16 +552,21 @@ static UIColor *L77LightPurple(void) {
 }
 
 - (void)rebuildUI {
+    BOOL wasVisible = !self.menu.hidden; // ← ЗАПОМИНАЕМ СОСТОЯНИЕ
+    
     [self.menu removeFromSuperview];
     self.menu = nil;
     [self.contentStack removeFromSuperview];
     self.contentStack = nil;
     [self.navStack removeFromSuperview];
     self.navStack = nil;
+    
     [self buildMenu];
-    if (!self.menu.hidden) {
+    
+    if (wasVisible) {
         self.menu.hidden = NO;
-        self.menu.alpha = 1;
+        self.menu.alpha = 1.0;
+        self.menu.userInteractionEnabled = YES;
     }
 }
 
