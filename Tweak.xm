@@ -218,7 +218,7 @@ static UIColor *L77LightPurple(void) {
     CGContextRef context = UIGraphicsGetCurrentContext();
     UIColor *color = gFOVCircleColor ?: [UIColor colorWithRed:1.0 green:1.0 blue:0.0 alpha:0.3];
     
-    CGContextSetFillColorWithContext(context, [color colorWithAlphaComponent:0.15].CGColor);
+    CGContextSetFillColorWithColor(context, [color colorWithAlphaComponent:0.15].CGColor);
     CGContextSetStrokeColorWithColor(context, color.CGColor);
     CGContextSetLineWidth(context, 1.5);
     
@@ -889,7 +889,11 @@ static UIColor *L77LightPurple(void) {
     }
     
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+    
+    UIViewController *rootVC = [self window].rootViewController;
+    if (rootVC) {
+        [rootVC presentViewController:alert animated:YES completion:nil];
+    }
 }
 
 - (void)themeChanged:(UISegmentedControl *)sender {
@@ -1094,11 +1098,17 @@ __attribute__((constructor)) void init() {
         }
         
         if (!mainWindow) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
             mainWindow = UIApplication.sharedApplication.keyWindow;
+            #pragma clang diagnostic pop
         }
         
         if (!mainWindow) {
+            #pragma clang diagnostic push
+            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
             mainWindow = UIApplication.sharedApplication.windows.firstObject;
+            #pragma clang diagnostic pop
         }
         
         if (mainWindow) {
