@@ -10,6 +10,7 @@ static BOOL gNoRecoil = NO;
 static BOOL gUnlimitedAmmo = NO;
 static NSInteger gFPSLimit = 60;
 static BOOL gFirstOpen = YES;
+static UIWindow *gLucky77Window = nil; // ← СОХРАНЯЕМ ОКНО
 
 // ============ ЗВУКИ ============
 static void PlayToggleSound(BOOL isOn) {
@@ -126,6 +127,9 @@ static UIColor *L77Border(void) {
 @property(nonatomic,assign) BOOL isDragging;
 @property(nonatomic,assign) CGPoint dragOffset;
 @property(nonatomic,assign) BOOL introShown;
+// Constraints для перетаскивания
+@property(nonatomic,strong) NSLayoutConstraint *leadingConstraint;
+@property(nonatomic,strong) NSLayoutConstraint *topConstraint;
 @end
 
 @implementation Lucky77OverlayView
@@ -134,19 +138,13 @@ static UIColor *L77Border(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO;
+        self.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
         self.introShown = NO;
         
         [self buildLauncherButton];
         [self buildMenu];
         [self buildIntro];
         [self startFPS];
-        
-        // Принудительно показываем кнопку
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-            self.launcherButton.hidden = NO;
-            NSLog(@"[Lucky77] ✅ Launcher button forced to show!");
-        });
     }
     return self;
 }
@@ -175,23 +173,36 @@ static UIColor *L77Border(void) {
     
     [self addSubview:self.launcherButton];
     
+    // Сохраняем constraints для перетаскивания
+    self.leadingConstraint = [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12];
+    self.topConstraint = [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:12];
+    
     [NSLayoutConstraint activateConstraints:@[
-        [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12],
-        [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:12],
+        self.leadingConstraint,
+        self.topConstraint,
         [self.launcherButton.widthAnchor constraintEqualToConstant:48],
         [self.launcherButton.heightAnchor constraintEqualToConstant:48],
     ]];
+    
+    [self bringSubviewToFront:self.launcherButton];
+    NSLog(@"[Lucky77] ✅ Launcher button built");
 }
 
 - (void)dragLauncher:(UIPanGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateBegan) {
         self.isDragging = YES;
-        CGPoint touch = [gesture locationInView:self];
-        CGPoint center = self.launcherButton.center;
-        self.dragOffset = CGPointMake(center.x - touch.x, center.y - touch.y);
     } else if (gesture.state == UIGestureRecognizerStateChanged) {
-        CGPoint touch = [gesture locationInView:self];
-        self.launcherButton.center = CGPointMake(touch.x + self.dragOffset.x, touch.y + self.dragOffset.y);
+        CGPoint translation = [gesture translationInView:self];
+        CGFloat newX = self.leadingConstraint.constant + translation.x;
+        CGFloat newY = self.topConstraint.constant + translation.y;
+        
+        // Ограничиваем, чтобы кнопка не выходила за экран
+        newX = MAX(0, MIN(newX, self.bounds.size.width - 60));
+        newY = MAX(0, MIN(newY, self.bounds.size.height - 60));
+        
+        self.leadingConstraint.constant = newX;
+        self.topConstraint.constant = newY;
+        [gesture setTranslation:CGPointZero inView:self];
     } else if (gesture.state == UIGestureRecognizerStateEnded) {
         self.isDragging = NO;
     }
@@ -595,7 +606,6 @@ static UIColor *L77Border(void) {
             self.menu.hidden = NO;
             self.menu.alpha = 0;
             self.launcherButton.hidden = YES;
-            self.userInteractionEnabled = YES;
             
             [UIView animateWithDuration:0.25 animations:^{
                 self.menu.alpha = 1;
@@ -608,7 +618,8 @@ static UIColor *L77Border(void) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.launcherButton.hidden = NO;
-            self.userInteractionEnabled = NO;
+            // ← НЕ ОТКЛЮЧАЕМ ВЗАИМОДЕЙСТВИЕ
+            self.userInteractionEnabled = YES;
         }];
     }
 }
@@ -621,27 +632,59 @@ static UIColor *L77Border(void) {
 @end
 
 // ============ ТОЧКА ВХОДА ============
+static void ShowLucky77Overlay(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindowScene *windowScene = nil;
+        
+        if (@available(iOS 13.0, *)) {
+            for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+                if ([scene isKindOfClass:UIWindowScene.class] &&
+                    scene.activationState == UISceneActivationStateForegroundActive) {
+                    windowScene = (UIWindowScene *)scene;
+                    break;
+                }
+            }
+        }
+        
+        UIWindow *window;
+        
+        if (@available(iOS 13.0, *)) {
+            if (!windowScene) {
+                NSLog(@"[Lucky77] No active UIWindowScene");
+                return;
+            }
+            window = [[UIWindow alloc] initWithWindowScene:windowScene];
+            window.frame = windowScene.coordinateSpace.bounds;
+        } else {
+            window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+        }
+        
+        window.backgroundColor = UIColor.clearColor;
+        window.windowLevel = UIWindowLevelAlert + 1;
+        window.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
+        
+        UIViewController *root = [UIViewController new];
+        root.view.backgroundColor = UIColor.clearColor;
+        root.view.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
+        
+        Lucky77OverlayView *overlay = [[Lucky77OverlayView alloc] initWithFrame:window.bounds];
+        overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        overlay.backgroundColor = UIColor.clearColor;
+        overlay.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ
+        
+        root.view = overlay;
+        window.rootViewController = root;
+        window.hidden = NO;
+        
+        gLucky77Window = window;
+        
+        NSLog(@"[Lucky77] ✅ Overlay visible");
+    });
+}
+
 __attribute__((constructor)) void init() {
+    NSLog(@"[Lucky77] ⏳ init() called");
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        UIWindow *overlayWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        overlayWindow.backgroundColor = [UIColor clearColor];
-        overlayWindow.windowLevel = UIWindowLevelAlert + 1;
-        overlayWindow.userInteractionEnabled = NO;
-        overlayWindow.hidden = NO;
-        
-        UIViewController *rootVC = [UIViewController new];
-        rootVC.view.backgroundColor = [UIColor clearColor];
-        rootVC.view.userInteractionEnabled = NO;
-        
-        Lucky77OverlayView *overlayView = [[Lucky77OverlayView alloc] initWithFrame:overlayWindow.bounds];
-        overlayView.backgroundColor = [UIColor clearColor];
-        overlayView.userInteractionEnabled = NO;
-        
-        rootVC.view = overlayView;
-        overlayWindow.rootViewController = rootVC;
-        
-        [overlayWindow makeKeyAndVisible];
-        
-        NSLog(@"[Lucky77] ✅ Overlay window created!");
+        ShowLucky77Overlay();
     });
 }
