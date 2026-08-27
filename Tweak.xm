@@ -174,15 +174,15 @@ static NSString* L(NSString *key) {
 @property (nonatomic, assign) BOOL logoLoaded;
 @end
 
-// ============ ВСЯ ЛОГИКА МЕНЮ ============
 @implementation L77MenuViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
     
+    // ============ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: ВКЛЮЧАЕМ КАСАНИЯ ============
     self.view.backgroundColor = [UIColor clearColor];
     self.view.opaque = NO;
-    self.view.userInteractionEnabled = NO;
+    self.view.userInteractionEnabled = YES; // ← ИСПРАВЛЕНО: включаем касания
     self.modalPresentationStyle = UIModalPresentationOverFullScreen;
     self.firstOpen = YES;
     self.logoLoaded = NO;
@@ -286,6 +286,7 @@ static NSString* L(NSString *key) {
         [self.menuCard.heightAnchor constraintEqualToConstant:350],
     ]];
     
+    // HEADER
     UIView *header = [UIView new];
     header.translatesAutoresizingMaskIntoConstraints = NO;
     [self.menuCard addSubview:header];
@@ -552,6 +553,7 @@ static NSString* L(NSString *key) {
         [self.introView.heightAnchor constraintEqualToConstant:260],
     ]];
     
+    // ============ ЛОГОТИП ИЗ BUNDLE ============
     self.logoView = [UIImageView new];
     self.logoView.translatesAutoresizingMaskIntoConstraints = NO;
     self.logoView.contentMode = UIViewContentModeScaleAspectFit;
@@ -560,8 +562,18 @@ static NSString* L(NSString *key) {
     self.logoView.backgroundColor = [UIColor clearColor];
     [self.introView addSubview:self.logoView];
     
-    [self loadLogo];
+    // Загружаем логотип из bundle (встроенный файл)
+    UIImage *logoImage = [UIImage imageNamed:@"logo"];
+    if (logoImage) {
+        self.logoView.image = logoImage;
+        self.logoLoaded = YES;
+        NSLog(@"[Lucky77] ✅ Logo loaded from bundle!");
+    } else {
+        NSLog(@"[Lucky77] ⚠️ Logo not found in bundle, using fallback");
+        [self showFallbackLogo];
+    }
     
+    // ============ БОЛЬШАЯ МОЛНИЯ (ЗАПАСНОЙ ВАРИАНТ) ============
     self.bigLogo = [UILabel new];
     self.bigLogo.translatesAutoresizingMaskIntoConstraints = NO;
     self.bigLogo.text = @"⚡";
@@ -571,9 +583,10 @@ static NSString* L(NSString *key) {
     self.bigLogo.layer.shadowColor = [UIColor colorWithRed:0.73 green:0.36 blue:1.0 alpha:1.0].CGColor;
     self.bigLogo.layer.shadowOpacity = 0.9;
     self.bigLogo.layer.shadowRadius = 30;
-    self.bigLogo.hidden = YES;
+    self.bigLogo.hidden = logoImage ? YES : NO;
     [self.introView addSubview:self.bigLogo];
     
+    // ============ НАЗВАНИЕ ============
     self.titleLabel = [UILabel new];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.text = @"Lucky77";
@@ -585,6 +598,7 @@ static NSString* L(NSString *key) {
     self.titleLabel.layer.shadowRadius = 20;
     [self.introView addSubview:self.titleLabel];
     
+    // ============ ВЕРСИЯ ============
     self.versionLabel = [UILabel new];
     self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.versionLabel.text = @"v0.1";
@@ -609,49 +623,10 @@ static NSString* L(NSString *key) {
     ]];
 }
 
-// ============ ЗАГРУЗКА ЛОГОТИПА ============
-- (void)loadLogo {
-    NSString *logoURL = @"https://raw.githubusercontent.com/77unlucky-hack/Stadnoff2IosHack77/main/logo.png";
-    NSURL *url = [NSURL URLWithString:logoURL];
-    NSLog(@"[Lucky77] Loading logo from: %@", logoURL);
-    
-    NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
-    config.timeoutIntervalForRequest = 10.0;
-    config.timeoutIntervalForResource = 15.0;
-    NSURLSession *session = [NSURLSession sessionWithConfiguration:config];
-    
-    NSURLSessionDataTask *task = [session dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        if (error) {
-            NSLog(@"[Lucky77] Logo download error: %@", error.localizedDescription);
-            [self showFallbackLogo];
-            return;
-        }
-        
-        if (data && data.length > 0) {
-            UIImage *image = [UIImage imageWithData:data];
-            if (image) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    self.logoView.image = image;
-                    self.logoView.backgroundColor = [UIColor clearColor];
-                    self.logoLoaded = YES;
-                    self.bigLogo.hidden = YES;
-                    NSLog(@"[Lucky77] Logo loaded successfully!");
-                });
-            } else {
-                [self showFallbackLogo];
-            }
-        } else {
-            [self showFallbackLogo];
-        }
-    }];
-    [task resume];
-}
-
 - (void)showFallbackLogo {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.logoView.hidden = YES;
-        self.bigLogo.hidden = NO;
-    });
+    self.logoView.hidden = YES;
+    self.bigLogo.hidden = NO;
+    NSLog(@"[Lucky77] Showing fallback logo (⚡)");
 }
 
 // ============ ПОКАЗ ИНТРО ============
@@ -798,7 +773,6 @@ static NSString* L(NSString *key) {
 
 // ============ ТОЧКА ВХОДА ДЛЯ TWEAK (.xm) ============
 %ctor {
-    // Этот код выполняется при загрузке твика (аналог __attribute__((constructor)))
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         UIWindow *window = nil;
         if (@available(iOS 13.0, *)) {
