@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
+#import <objc/runtime.h>
 
 // ============ BUNDLE ID ДЛЯ STANDOFF 2 ============
 #define BUNDLE_ID @"com.axelbolt.standoff2"
@@ -15,6 +16,32 @@ static NSInteger gFPSLimit = 60;
 static BOOL gFirstOpen = YES;
 static BOOL gDarkTheme = YES;
 
+// ============ НАСТРОЙКИ АИМБОТА ============
+static CGFloat gAimbotSpeed = 5.0;
+static CGFloat gAimbotSharpness = 1.0;
+static NSInteger gAimbotTarget = 0;
+static CGFloat gAimbotFOV = 0.0;
+static NSString *gAimbotTargetNames[] = {@"HEAD", @"NECK", @"BODY"};
+static CGFloat gAimbotTargetOffsets[] = {1.6, 1.2, 0.8};
+
+// ============ ЦВЕТА ДЛЯ ESP ============
+static UIColor *gESPBoxColorVisible = nil;
+static UIColor *gESPBoxColorInvisible = nil;
+static UIColor *gESPLinesColor = nil;
+static UIColor *gFOVCircleColor = nil;
+static CGFloat gFOVRadius = 0.0;
+
+static void InitColors(void) {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        gESPBoxColorVisible = [UIColor colorWithRed:0.0 green:1.0 blue:0.0 alpha:1.0];
+        gESPBoxColorInvisible = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:0.6];
+        gESPLinesColor = [UIColor colorWithRed:1.0 green:1.0 blue:0.0 alpha:1.0];
+        gFOVCircleColor = [UIColor colorWithRed:1.0 green:1.0 blue:0.0 alpha:0.3];
+        gFOVRadius = 0.0;
+    });
+}
+
 // ============ ЗВУКИ ============
 static void PlayToggleSound(BOOL isOn) {
     @try {
@@ -23,7 +50,7 @@ static void PlayToggleSound(BOOL isOn) {
     } @catch (NSException *exception) {}
 }
 
-// ============ ЦВЕТА ============
+// ============ ЦВЕТА ТЕМЫ ============
 static UIColor *L77Background(void) {
     return gDarkTheme ?
         [UIColor colorWithRed:0.035 green:0.035 blue:0.060 alpha:0.97] :
@@ -157,8 +184,11 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
+        self.opaque = NO;
         self.userInteractionEnabled = YES;
         self.introShown = NO;
+        
+        InitColors();
         
         [self buildLauncherButton];
         [self buildMenu];
@@ -170,6 +200,47 @@ static UIColor *L77LightPurple(void) {
 
 - (void)dealloc {
     [self.displayLink invalidate];
+}
+
+// ============ ОТРИСОВКА КРУГА FOV ============
+- (void)drawRect:(CGRect)rect {
+    [super drawRect:rect];
+    
+    if (gAimbotFOV <= 0 || !gAimbot) {
+        return;
+    }
+    
+    CGPoint center = CGPointMake(self.bounds.size.width / 2, self.bounds.size.height / 2);
+    CGFloat radius = gAimbotFOV / 2.0;
+    CGFloat maxRadius = MIN(self.bounds.size.width, self.bounds.size.height) / 2.5;
+    radius = MIN(radius, maxRadius);
+    
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    UIColor *color = gFOVCircleColor ?: [UIColor colorWithRed:1.0 green:1.0 blue:0.0 alpha:0.3];
+    
+    CGContextSetFillColorWithContext(context, [color colorWithAlphaComponent:0.15].CGColor);
+    CGContextSetStrokeColorWithColor(context, color.CGColor);
+    CGContextSetLineWidth(context, 1.5);
+    
+    CGFloat dashPattern[] = {4, 3};
+    CGContextSetLineDash(context, 0, dashPattern, 2);
+    
+    CGRect circleRect = CGRectMake(center.x - radius, center.y - radius, radius * 2, radius * 2);
+    CGContextAddEllipseInRect(context, circleRect);
+    CGContextDrawPath(context, kCGPathFillStroke);
+    
+    CGFloat crossSize = 6;
+    CGContextSetLineDash(context, 0, NULL, 0);
+    CGContextSetStrokeColorWithColor(context, color.CGColor);
+    CGContextSetLineWidth(context, 1.0);
+    
+    CGContextMoveToPoint(context, center.x - crossSize, center.y);
+    CGContextAddLineToPoint(context, center.x + crossSize, center.y);
+    CGContextStrokePath(context);
+    
+    CGContextMoveToPoint(context, center.x, center.y - crossSize);
+    CGContextAddLineToPoint(context, center.x, center.y + crossSize);
+    CGContextStrokePath(context);
 }
 
 // ============ КНОПКА-ЛАУНЧЕР ============
@@ -233,7 +304,6 @@ static UIColor *L77LightPurple(void) {
 
 // ============ ПРОПУСК КАСАНИЙ ============
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    // Кнопка-лаунчер
     if (self.launcherButton &&
         !self.launcherButton.hidden &&
         self.launcherButton.alpha > 0.01) {
@@ -242,7 +312,6 @@ static UIColor *L77LightPurple(void) {
             return [self.launcherButton hitTest:launcherPoint withEvent:event];
         }
     }
-    // Открытое меню
     if (self.menu &&
         !self.menu.hidden &&
         self.menu.alpha > 0.01) {
@@ -251,7 +320,6 @@ static UIColor *L77LightPurple(void) {
             return [self.menu hitTest:menuPoint withEvent:event];
         }
     }
-    // Остальные касания проходят сквозь overlay
     return nil;
 }
 
@@ -269,14 +337,14 @@ static UIColor *L77LightPurple(void) {
     
     [self addSubview:self.menu];
     
-    self.menuLeadingConstraint = [self.menu.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:40];
-    self.menuTopConstraint = [self.menu.topAnchor constraintEqualToAnchor:self.topAnchor constant:60];
+    self.menuLeadingConstraint = [self.menu.centerXAnchor constraintEqualToAnchor:self.centerXAnchor];
+    self.menuTopConstraint = [self.menu.centerYAnchor constraintEqualToAnchor:self.centerYAnchor constant:-20];
     
     [NSLayoutConstraint activateConstraints:@[
         self.menuLeadingConstraint,
         self.menuTopConstraint,
         [self.menu.widthAnchor constraintEqualToConstant:420],
-        [self.menu.heightAnchor constraintEqualToConstant:480]
+        [self.menu.heightAnchor constraintEqualToConstant:380]
     ]];
     
     UIPanGestureRecognizer *dragMenu = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragMenu:)];
@@ -290,12 +358,14 @@ static UIColor *L77LightPurple(void) {
 - (void)dragMenu:(UIPanGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateChanged) {
         CGPoint translation = [gesture translationInView:self];
-        CGFloat newX = self.menuLeadingConstraint.constant + translation.x;
-        CGFloat newY = self.menuTopConstraint.constant + translation.y;
-        newX = MAX(0, MIN(newX, self.bounds.size.width - 420));
-        newY = MAX(0, MIN(newY, self.bounds.size.height - 480));
-        self.menuLeadingConstraint.constant = newX;
-        self.menuTopConstraint.constant = newY;
+        CGFloat newCenterX = self.menu.center.x + translation.x;
+        CGFloat newCenterY = self.menu.center.y + translation.y;
+        CGFloat halfWidth = 420 / 2;
+        CGFloat halfHeight = 380 / 2;
+        newCenterX = MAX(halfWidth, MIN(newCenterX, self.bounds.size.width - halfWidth));
+        newCenterY = MAX(halfHeight + 20, MIN(newCenterY, self.bounds.size.height - halfHeight - 20));
+        self.menuLeadingConstraint.constant = newCenterX - self.bounds.size.width / 2;
+        self.menuTopConstraint.constant = newCenterY - self.bounds.size.height / 2 - 20;
         [gesture setTranslation:CGPointZero inView:self];
     }
 }
@@ -345,7 +415,7 @@ static UIColor *L77LightPurple(void) {
         [header.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor],
         [header.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor],
         [header.topAnchor constraintEqualToAnchor:self.menu.topAnchor],
-        [header.heightAnchor constraintEqualToConstant:56],
+        [header.heightAnchor constraintEqualToConstant:46],
         [self.fpsLabel.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
         [self.fpsLabel.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
         [title.centerXAnchor constraintEqualToAnchor:header.centerXAnchor constant:-12],
@@ -431,12 +501,12 @@ static UIColor *L77LightPurple(void) {
     
     [NSLayoutConstraint activateConstraints:@[
         [sidebar.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor constant:12],
-        [sidebar.topAnchor constraintEqualToAnchor:self.menu.topAnchor constant:68],
+        [sidebar.topAnchor constraintEqualToAnchor:self.menu.topAnchor constant:58],
         [sidebar.bottomAnchor constraintEqualToAnchor:self.menu.bottomAnchor constant:-12],
         [sidebar.widthAnchor constraintEqualToConstant:100],
         [self.navStack.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor constant:8],
         [self.navStack.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:-8],
-        [self.navStack.topAnchor constraintEqualToAnchor:sidebar.topAnchor constant:12],
+        [self.navStack.topAnchor constraintEqualToAnchor:sidebar.topAnchor constant:8],
         [scroll.leadingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:12],
         [scroll.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor constant:-12],
         [scroll.topAnchor constraintEqualToAnchor:sidebar.topAnchor],
@@ -467,13 +537,7 @@ static UIColor *L77LightPurple(void) {
     
     UIView *content = nil;
     if (index == 0) {
-        content = [self togglePanel:@[
-            @"ENABLE AIMBOT",
-            @"TRIGGERBOT",
-            @"SMOOTH AIM",
-            @"VISIBLE CHECK",
-            @"AIM FOV"
-        ] keys:@[@"aimbot", @"trigger", @"smooth", @"visible", @"fov"]];
+        content = [self aimbotPanel];
     } else if (index == 1) {
         content = [self togglePanel:@[
             @"ESP BOX",
@@ -519,7 +583,127 @@ static UIColor *L77LightPurple(void) {
     return panel;
 }
 
-// ============ SETTINGS ============
+// ============ AIMBOT PANEL ============
+- (UIView *)aimbotPanel {
+    UIView *panel = [UIView new];
+    panel.backgroundColor = L77Panel();
+    panel.layer.cornerRadius = 8;
+    panel.layer.borderWidth = 1;
+    panel.layer.borderColor = L77Border().CGColor;
+    
+    UIStackView *stack = [UIStackView new];
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.spacing = 12;
+    [panel addSubview:stack];
+    
+    UILabel *title = [UILabel new];
+    title.text = @"AIMBOT SETTINGS";
+    title.textColor = L77TextPrimary();
+    title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    [stack addArrangedSubview:title];
+    
+    L77Toggle *aimbotToggle = [[L77Toggle alloc] initWithTitle:@"ENABLE AIMBOT" key:@"aimbot"];
+    [stack addArrangedSubview:aimbotToggle];
+    
+    L77Toggle *triggerToggle = [[L77Toggle alloc] initWithTitle:@"TRIGGERBOT" key:@"trigger"];
+    [stack addArrangedSubview:triggerToggle];
+    
+    UILabel *targetLabel = [UILabel new];
+    targetLabel.text = @"TARGET";
+    targetLabel.textColor = L77TextSecondary();
+    targetLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [stack addArrangedSubview:targetLabel];
+    
+    UISegmentedControl *targetSegment = [[UISegmentedControl alloc] initWithItems:@[@"HEAD", @"NECK", @"BODY"]];
+    targetSegment.selectedSegmentIndex = gAimbotTarget;
+    targetSegment.tintColor = L77Purple();
+    [targetSegment addTarget:self action:@selector(targetChanged:) forControlEvents:UIControlEventValueChanged];
+    [stack addArrangedSubview:targetSegment];
+    
+    UILabel *speedLabel = [UILabel new];
+    speedLabel.text = @"SPEED (smoothness)";
+    speedLabel.textColor = L77TextSecondary();
+    speedLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [stack addArrangedSubview:speedLabel];
+    
+    UISlider *speedSlider = [UISlider new];
+    speedSlider.minimumValue = 0.5;
+    speedSlider.maximumValue = 20.0;
+    speedSlider.value = gAimbotSpeed;
+    speedSlider.minimumTrackTintColor = L77Purple();
+    speedSlider.maximumTrackTintColor = L77Border();
+    [speedSlider addTarget:self action:@selector(speedChanged:) forControlEvents:UIControlEventValueChanged];
+    [stack addArrangedSubview:speedSlider];
+    
+    UILabel *speedValueLabel = [UILabel new];
+    speedValueLabel.text = [NSString stringWithFormat:@"%.1f", gAimbotSpeed];
+    speedValueLabel.textColor = L77TextSecondary();
+    speedValueLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    speedValueLabel.tag = 300;
+    [stack addArrangedSubview:speedValueLabel];
+    
+    UILabel *sharpnessLabel = [UILabel new];
+    sharpnessLabel.text = @"SHARPNESS (1.0 = instant)";
+    sharpnessLabel.textColor = L77TextSecondary();
+    sharpnessLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [stack addArrangedSubview:sharpnessLabel];
+    
+    UISlider *sharpnessSlider = [UISlider new];
+    sharpnessSlider.minimumValue = 0.1;
+    sharpnessSlider.maximumValue = 1.0;
+    sharpnessSlider.value = gAimbotSharpness;
+    sharpnessSlider.minimumTrackTintColor = L77Purple();
+    sharpnessSlider.maximumTrackTintColor = L77Border();
+    [sharpnessSlider addTarget:self action:@selector(sharpnessChanged:) forControlEvents:UIControlEventValueChanged];
+    [stack addArrangedSubview:sharpnessSlider];
+    
+    UILabel *sharpnessValueLabel = [UILabel new];
+    sharpnessValueLabel.text = [NSString stringWithFormat:@"%.2f", gAimbotSharpness];
+    sharpnessValueLabel.textColor = L77TextSecondary();
+    sharpnessValueLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    sharpnessValueLabel.tag = 301;
+    [stack addArrangedSubview:sharpnessValueLabel];
+    
+    L77Toggle *smoothToggle = [[L77Toggle alloc] initWithTitle:@"SMOOTH AIM" key:@"smooth"];
+    [stack addArrangedSubview:smoothToggle];
+    
+    L77Toggle *visibleToggle = [[L77Toggle alloc] initWithTitle:@"VISIBLE CHECK" key:@"visible"];
+    [stack addArrangedSubview:visibleToggle];
+    
+    UILabel *fovLabel = [UILabel new];
+    fovLabel.text = @"AIM FOV";
+    fovLabel.textColor = L77TextSecondary();
+    fovLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [stack addArrangedSubview:fovLabel];
+    
+    UISlider *fovSlider = [UISlider new];
+    fovSlider.minimumValue = 0;
+    fovSlider.maximumValue = 360;
+    fovSlider.value = gAimbotFOV;
+    fovSlider.minimumTrackTintColor = L77Purple();
+    fovSlider.maximumTrackTintColor = L77Border();
+    [fovSlider addTarget:self action:@selector(aimFOVChanged:) forControlEvents:UIControlEventValueChanged];
+    [stack addArrangedSubview:fovSlider];
+    
+    UILabel *fovValueLabel = [UILabel new];
+    fovValueLabel.text = [NSString stringWithFormat:@"%.0f°", gAimbotFOV];
+    fovValueLabel.textColor = L77TextSecondary();
+    fovValueLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    fovValueLabel.tag = 400;
+    [stack addArrangedSubview:fovValueLabel];
+    
+    [NSLayoutConstraint activateConstraints:@[
+        [stack.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:16],
+        [stack.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-16],
+        [stack.topAnchor constraintEqualToAnchor:panel.topAnchor constant:14],
+        [stack.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-14]
+    ]];
+    
+    return panel;
+}
+
+// ============ SETTINGS PANEL ============
 - (UIView *)settingsPanel {
     UIView *panel = [UIView new];
     panel.backgroundColor = L77Panel();
@@ -530,7 +714,7 @@ static UIColor *L77LightPurple(void) {
     UIStackView *stack = [UIStackView new];
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     stack.axis = UILayoutConstraintAxisVertical;
-    stack.spacing = 14;
+    stack.spacing = 12;
     [panel addSubview:stack];
     
     UILabel *title = [UILabel new];
@@ -539,7 +723,6 @@ static UIColor *L77LightPurple(void) {
     title.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
     [stack addArrangedSubview:title];
     
-    // ТЕМА
     UILabel *themeLabel = [UILabel new];
     themeLabel.text = @"THEME";
     themeLabel.textColor = L77TextSecondary();
@@ -552,7 +735,6 @@ static UIColor *L77LightPurple(void) {
     [themeSegment addTarget:self action:@selector(themeChanged:) forControlEvents:UIControlEventValueChanged];
     [stack addArrangedSubview:themeSegment];
     
-    // FPS
     UILabel *fpsLabel = [UILabel new];
     fpsLabel.text = @"FPS LIMIT";
     fpsLabel.textColor = L77TextSecondary();
@@ -565,7 +747,24 @@ static UIColor *L77LightPurple(void) {
     [fpsSegment addTarget:self action:@selector(fpsLimitChanged:) forControlEvents:UIControlEventValueChanged];
     [stack addArrangedSubview:fpsSegment];
     
-    // DEVELOPER
+    UILabel *espColorLabel = [UILabel new];
+    espColorLabel.text = @"ESP COLORS";
+    espColorLabel.textColor = L77TextSecondary();
+    espColorLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    [stack addArrangedSubview:espColorLabel];
+    
+    UIStackView *visibleColorRow = [self colorRowWithTitle:@"VISIBLE BOX" color:gESPBoxColorVisible tag:100];
+    [stack addArrangedSubview:visibleColorRow];
+    
+    UIStackView *invisibleColorRow = [self colorRowWithTitle:@"INVISIBLE BOX" color:gESPBoxColorInvisible tag:101];
+    [stack addArrangedSubview:invisibleColorRow];
+    
+    UIStackView *linesColorRow = [self colorRowWithTitle:@"LINES COLOR" color:gESPLinesColor tag:102];
+    [stack addArrangedSubview:linesColorRow];
+    
+    UIStackView *fovColorRow = [self colorRowWithTitle:@"FOV COLOR" color:gFOVCircleColor tag:103];
+    [stack addArrangedSubview:fovColorRow];
+    
     UILabel *devLabel = [UILabel new];
     devLabel.text = @"DEVELOPER";
     devLabel.textColor = L77TextSecondary();
@@ -589,13 +788,117 @@ static UIColor *L77LightPurple(void) {
     return panel;
 }
 
-// ============ ТЕМА ============
+// ============ COLOR ROW ============
+- (UIStackView *)colorRowWithTitle:(NSString *)title color:(UIColor *)color tag:(NSInteger)tag {
+    UIStackView *row = [UIStackView new];
+    row.axis = UILayoutConstraintAxisHorizontal;
+    row.spacing = 12;
+    row.alignment = UIStackViewAlignmentCenter;
+    row.distribution = UIStackViewDistributionFill;
+    row.translatesAutoresizingMaskIntoConstraints = NO;
+    
+    UILabel *label = [UILabel new];
+    label.text = title;
+    label.textColor = L77TextPrimary();
+    label.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [row addArrangedSubview:label];
+    
+    UIButton *colorBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    colorBtn.backgroundColor = color ?: UIColor.whiteColor;
+    colorBtn.layer.cornerRadius = 12;
+    colorBtn.layer.borderWidth = 1;
+    colorBtn.layer.borderColor = L77Border().CGColor;
+    colorBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [colorBtn.widthAnchor constraintEqualToConstant:24].active = YES;
+    [colorBtn.heightAnchor constraintEqualToConstant:24].active = YES;
+    colorBtn.tag = tag;
+    [colorBtn addTarget:self action:@selector(colorButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [row addArrangedSubview:colorBtn];
+    
+    objc_setAssociatedObject(colorBtn, "color", color, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    
+    return row;
+}
+
+// ============ ОБРАБОТЧИКИ ============
+- (void)targetChanged:(UISegmentedControl *)sender {
+    gAimbotTarget = sender.selectedSegmentIndex;
+    NSLog(@"[Lucky77] Target changed to: %@", gAimbotTargetNames[gAimbotTarget]);
+}
+
+- (void)speedChanged:(UISlider *)sender {
+    gAimbotSpeed = sender.value;
+    UILabel *speedLabel = (UILabel *)[self viewWithTag:300];
+    if (speedLabel) {
+        speedLabel.text = [NSString stringWithFormat:@"%.1f", gAimbotSpeed];
+    }
+    NSLog(@"[Lucky77] Speed: %.1f", gAimbotSpeed);
+}
+
+- (void)sharpnessChanged:(UISlider *)sender {
+    gAimbotSharpness = sender.value;
+    UILabel *sharpnessLabel = (UILabel *)[self viewWithTag:301];
+    if (sharpnessLabel) {
+        sharpnessLabel.text = [NSString stringWithFormat:@"%.2f", gAimbotSharpness];
+    }
+    NSLog(@"[Lucky77] Sharpness: %.2f", gAimbotSharpness);
+}
+
+- (void)aimFOVChanged:(UISlider *)sender {
+    gAimbotFOV = sender.value;
+    UILabel *fovValueLabel = (UILabel *)[self viewWithTag:400];
+    if (fovValueLabel) {
+        fovValueLabel.text = [NSString stringWithFormat:@"%.0f°", gAimbotFOV];
+    }
+    NSLog(@"[Lucky77] Aim FOV: %.0f°", gAimbotFOV);
+    [self setNeedsDisplay];
+}
+
+- (void)colorButtonTapped:(UIButton *)sender {
+    NSInteger tag = sender.tag;
+    
+    NSArray *colors = @[
+        @{@"name": @"Red", @"color": [UIColor redColor]},
+        @{@"name": @"Green", @"color": [UIColor greenColor]},
+        @{@"name": @"Blue", @"color": [UIColor blueColor]},
+        @{@"name": @"Yellow", @"color": [UIColor yellowColor]},
+        @{@"name": @"Orange", @"color": [UIColor orangeColor]},
+        @{@"name": @"Purple", @"color": [UIColor purpleColor]},
+        @{@"name": @"Cyan", @"color": [UIColor cyanColor]},
+        @{@"name": @"White", @"color": [UIColor whiteColor]},
+        @{@"name": @"Black", @"color": [UIColor blackColor]},
+    ];
+    
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Select Color" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    
+    for (NSDictionary *item in colors) {
+        UIColor *color = item[@"color"];
+        NSString *name = item[@"name"];
+        [alert addAction:[UIAlertAction actionWithTitle:name style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            sender.backgroundColor = color;
+            objc_setAssociatedObject(sender, "color", color, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            
+            if (tag == 100) gESPBoxColorVisible = color;
+            else if (tag == 101) gESPBoxColorInvisible = color;
+            else if (tag == 102) gESPLinesColor = color;
+            else if (tag == 103) gFOVCircleColor = [color colorWithAlphaComponent:0.3];
+            
+            NSLog(@"[Lucky77] Color changed for tag %ld", (long)tag);
+        }]];
+    }
+    
+    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)themeChanged:(UISegmentedControl *)sender {
     gDarkTheme = (sender.selectedSegmentIndex == 0);
     [self rebuildUI];
 }
 
 - (void)rebuildUI {
+    CGPoint oldCenter = self.menu.center;
     BOOL wasVisible = !self.menu.hidden;
     
     [self.menu removeFromSuperview];
@@ -608,9 +911,38 @@ static UIColor *L77LightPurple(void) {
     [self buildMenu];
     
     if (wasVisible) {
+        self.menu.center = oldCenter;
         self.menu.hidden = NO;
         self.menu.alpha = 1.0;
         self.menu.userInteractionEnabled = YES;
+    }
+}
+
+- (void)fpsLimitChanged:(UISegmentedControl *)sender {
+    NSArray *values = @[@30, @60, @90, @120];
+    gFPSLimit = [values[sender.selectedSegmentIndex] integerValue];
+    self.displayLink.preferredFramesPerSecond = gFPSLimit;
+}
+
+// ============ FPS ============
+- (void)startFPS {
+    self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(fpsTick:)];
+    self.displayLink.preferredFramesPerSecond = gFPSLimit;
+    [self.displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+- (void)fpsTick:(CADisplayLink *)link {
+    if (self.lastTimestamp == 0) {
+        self.lastTimestamp = link.timestamp;
+        return;
+    }
+    self.frameCount++;
+    CFTimeInterval elapsed = link.timestamp - self.lastTimestamp;
+    if (elapsed >= 0.5) {
+        double fps = self.frameCount / elapsed;
+        self.fpsLabel.text = [NSString stringWithFormat:@"%.0f FPS", fps];
+        self.frameCount = 0;
+        self.lastTimestamp = link.timestamp;
     }
 }
 
@@ -691,34 +1023,6 @@ static UIColor *L77LightPurple(void) {
             }];
         });
     }];
-}
-
-// ============ FPS ============
-- (void)startFPS {
-    self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(fpsTick:)];
-    self.displayLink.preferredFramesPerSecond = gFPSLimit;
-    [self.displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
-}
-
-- (void)fpsTick:(CADisplayLink *)link {
-    if (self.lastTimestamp == 0) {
-        self.lastTimestamp = link.timestamp;
-        return;
-    }
-    self.frameCount++;
-    CFTimeInterval elapsed = link.timestamp - self.lastTimestamp;
-    if (elapsed >= 0.5) {
-        double fps = self.frameCount / elapsed;
-        self.fpsLabel.text = [NSString stringWithFormat:@"%.0f FPS", fps];
-        self.frameCount = 0;
-        self.lastTimestamp = link.timestamp;
-    }
-}
-
-- (void)fpsLimitChanged:(UISegmentedControl *)sender {
-    NSArray *values = @[@30, @60, @90, @120];
-    gFPSLimit = [values[sender.selectedSegmentIndex] integerValue];
-    self.displayLink.preferredFramesPerSecond = gFPSLimit;
 }
 
 // ============ УПРАВЛЕНИЕ МЕНЮ ============
