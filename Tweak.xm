@@ -1,9 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <AudioToolbox/AudioToolbox.h>
 
-// ============ BUNDLE ID ДЛЯ STANDOFF 2 ============
-#define BUNDLE_ID @"com.axelbolt.standof2"
-
 // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============
 static BOOL gAimbot = NO;
 static BOOL gTriggerbot = NO;
@@ -91,7 +88,6 @@ static UIColor *L77Panel(void) {
         }];
     }];
     
-    // Обновление глобальных флагов
     if ([self.key isEqualToString:@"aimbot"]) gAimbot = self.on;
     else if ([self.key isEqualToString:@"trigger"]) gTriggerbot = self.on;
     else if ([self.key isEqualToString:@"esp"]) gESP = self.on;
@@ -102,8 +98,8 @@ static UIColor *L77Panel(void) {
 
 @end
 
-// ============ ГЛАВНОЕ МЕНЮ ============
-@interface Lucky77MenuViewController : UIViewController
+// ============ ГЛАВНОЕ МЕНЮ (ОВЕРЛЕЙ) ============
+@interface Lucky77OverlayView : UIView
 @property(nonatomic,strong) UIView *menu;
 @property(nonatomic,strong) UIView *intro;
 @property(nonatomic,strong) UILabel *fpsLabel;
@@ -118,21 +114,21 @@ static UIColor *L77Panel(void) {
 @property(nonatomic,assign) CGPoint dragOffset;
 @end
 
-@implementation Lucky77MenuViewController
+@implementation Lucky77OverlayView
 
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    
-    self.view.backgroundColor = UIColor.clearColor;
-    self.view.userInteractionEnabled = YES;
-    
-    [self buildLauncherButton];
-    [self buildMenu];
-    [self buildIntro];
-    [self startFPS];
-    
-    // Показываем интро при первом открытии
-    [self showIntro];
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        self.backgroundColor = [UIColor clearColor];
+        self.userInteractionEnabled = NO; // По умолчанию не перехватываем касания
+        
+        [self buildLauncherButton];
+        [self buildMenu];
+        [self buildIntro];
+        [self startFPS];
+        [self showIntro];
+    }
+    return self;
 }
 
 - (void)dealloc {
@@ -156,11 +152,11 @@ static UIColor *L77Panel(void) {
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragLauncher:)];
     [self.launcherButton addGestureRecognizer:pan];
     
-    [self.view addSubview:self.launcherButton];
+    [self addSubview:self.launcherButton];
     
     [NSLayoutConstraint activateConstraints:@[
-        [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:10],
-        [self.launcherButton.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:10],
+        [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:10],
+        [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:10],
         [self.launcherButton.widthAnchor constraintEqualToConstant:44],
         [self.launcherButton.heightAnchor constraintEqualToConstant:44],
     ]];
@@ -169,11 +165,11 @@ static UIColor *L77Panel(void) {
 - (void)dragLauncher:(UIPanGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateBegan) {
         self.isDragging = YES;
-        CGPoint touch = [gesture locationInView:self.view];
+        CGPoint touch = [gesture locationInView:self];
         CGPoint center = self.launcherButton.center;
         self.dragOffset = CGPointMake(center.x - touch.x, center.y - touch.y);
     } else if (gesture.state == UIGestureRecognizerStateChanged) {
-        CGPoint touch = [gesture locationInView:self.view];
+        CGPoint touch = [gesture locationInView:self];
         self.launcherButton.center = CGPointMake(touch.x + self.dragOffset.x, touch.y + self.dragOffset.y);
     } else if (gesture.state == UIGestureRecognizerStateEnded) {
         self.isDragging = NO;
@@ -190,12 +186,13 @@ static UIColor *L77Panel(void) {
     self.menu.layer.borderColor = [UIColor colorWithWhite:0.5 alpha:0.25].CGColor;
     self.menu.clipsToBounds = YES;
     self.menu.hidden = YES;
+    self.menu.userInteractionEnabled = YES;
     
-    [self.view addSubview:self.menu];
+    [self addSubview:self.menu];
     
     [NSLayoutConstraint activateConstraints:@[
-        [self.menu.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.menu.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+        [self.menu.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
+        [self.menu.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
         [self.menu.widthAnchor constraintEqualToConstant:320],
         [self.menu.heightAnchor constraintEqualToConstant:390]
     ]];
@@ -450,7 +447,8 @@ static UIColor *L77Panel(void) {
     self.intro.backgroundColor = L77Background();
     self.intro.layer.cornerRadius = 22;
     self.intro.hidden = YES;
-    [self.view addSubview:self.intro];
+    self.intro.userInteractionEnabled = NO;
+    [self addSubview:self.intro];
     
     UILabel *logo = [UILabel new];
     logo.translatesAutoresizingMaskIntoConstraints = NO;
@@ -473,8 +471,8 @@ static UIColor *L77Panel(void) {
     [self.intro addSubview:title];
     
     [NSLayoutConstraint activateConstraints:@[
-        [self.intro.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.intro.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+        [self.intro.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
+        [self.intro.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
         [self.intro.widthAnchor constraintEqualToConstant:280],
         [self.intro.heightAnchor constraintEqualToConstant:250],
         [logo.centerXAnchor constraintEqualToAnchor:self.intro.centerXAnchor],
@@ -538,6 +536,7 @@ static UIColor *L77Panel(void) {
         self.menu.hidden = NO;
         self.menu.alpha = 0;
         self.launcherButton.hidden = YES;
+        self.userInteractionEnabled = YES; // Включаем касания только когда меню открыто
         
         [UIView animateWithDuration:0.2 animations:^{
             self.menu.alpha = 1;
@@ -549,6 +548,7 @@ static UIColor *L77Panel(void) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.launcherButton.hidden = NO;
+            self.userInteractionEnabled = NO; // Отключаем касания когда меню закрыто
         }];
     }
 }
@@ -561,43 +561,20 @@ static UIColor *L77Panel(void) {
 @end
 
 // ============ ТОЧКА ВХОДА ============
-__attribute__((constructor)) void init() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        UIWindow *window = nil;
-        if (@available(iOS 13.0, *)) {
-            for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
-                if ([scene isKindOfClass:[UIWindowScene class]] && scene.activationState == UISceneActivationStateForegroundActive) {
-                    for (UIWindow *w in scene.windows) {
-                        if (w.isKeyWindow) {
-                            window = w;
-                            break;
-                        }
-                    }
-                    if (window) break;
-                }
-            }
-        }
-        if (!window) {
-            #pragma clang diagnostic push
-            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            window = [UIApplication sharedApplication].keyWindow;
-            #pragma clang diagnostic pop
-        }
-        if (!window) {
-            #pragma clang diagnostic push
-            #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-            window = [UIApplication sharedApplication].windows.firstObject;
-            #pragma clang diagnostic pop
-        }
+%ctor {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        // Создаём отдельное окно поверх всего
+        UIWindow *overlayWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        overlayWindow.backgroundColor = [UIColor clearColor];
+        overlayWindow.windowLevel = UIWindowLevelAlert + 1; // Поверх всего
+        overlayWindow.userInteractionEnabled = NO; // По умолчанию не перехватывает касания
         
-        UIViewController *root = window.rootViewController;
-        if (root) {
-            Lucky77MenuViewController *menuVC = [Lucky77MenuViewController new];
-            menuVC.modalPresentationStyle = UIModalPresentationOverFullScreen;
-            [root presentViewController:menuVC animated:NO completion:nil];
-            NSLog(@"[Lucky77] ✅ Injected into Standoff 2!");
-        } else {
-            NSLog(@"[Lucky77] ❌ No root view controller");
-        }
+        Lucky77OverlayView *overlayView = [[Lucky77OverlayView alloc] initWithFrame:overlayWindow.bounds];
+        overlayWindow.rootViewController = [UIViewController new];
+        overlayWindow.rootViewController.view = overlayView;
+        
+        [overlayWindow makeKeyAndVisible];
+        
+        NSLog(@"[Lucky77] ✅ Overlay window created!");
     });
 }
