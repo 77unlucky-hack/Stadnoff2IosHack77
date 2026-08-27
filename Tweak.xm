@@ -141,6 +141,12 @@ static UIColor *L77Border(void) {
         [self buildMenu];
         [self buildIntro];
         [self startFPS];
+        
+        // Принудительно показываем кнопку
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            self.launcherButton.hidden = NO;
+            NSLog(@"[Lucky77] ✅ Launcher button forced to show!");
+        });
     }
     return self;
 }
@@ -161,6 +167,7 @@ static UIColor *L77Border(void) {
     [self.launcherButton setTitleColor:L77LightPurple() forState:UIControlStateNormal];
     self.launcherButton.titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
     self.launcherButton.userInteractionEnabled = YES;
+    self.launcherButton.hidden = NO;
     [self.launcherButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragLauncher:)];
@@ -622,9 +629,16 @@ __attribute__((constructor)) void init() {
         overlayWindow.userInteractionEnabled = NO;
         overlayWindow.hidden = NO;
         
+        UIViewController *rootVC = [UIViewController new];
+        rootVC.view.backgroundColor = [UIColor clearColor];
+        rootVC.view.userInteractionEnabled = NO;
+        
         Lucky77OverlayView *overlayView = [[Lucky77OverlayView alloc] initWithFrame:overlayWindow.bounds];
-        overlayWindow.rootViewController = [UIViewController new];
-        overlayWindow.rootViewController.view = overlayView;
+        overlayView.backgroundColor = [UIColor clearColor];
+        overlayView.userInteractionEnabled = NO;
+        
+        rootVC.view = overlayView;
+        overlayWindow.rootViewController = rootVC;
         
         [overlayWindow makeKeyAndVisible];
         
