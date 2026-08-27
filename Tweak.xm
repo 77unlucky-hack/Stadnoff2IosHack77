@@ -9,6 +9,15 @@ static BOOL gRadar = NO;
 static BOOL gNoRecoil = NO;
 static BOOL gUnlimitedAmmo = NO;
 static NSInteger gFPSLimit = 60;
+static BOOL gFirstOpen = YES;
+
+// ============ ЗВУКИ ============
+static void PlayToggleSound(BOOL isOn) {
+    @try {
+        SystemSoundID soundID = isOn ? 1103 : 1104;
+        AudioServicesPlaySystemSound(soundID);
+    } @catch (NSException *exception) {}
+}
 
 // ============ ЦВЕТА ============
 static UIColor *L77Purple(void) {
@@ -25,6 +34,10 @@ static UIColor *L77Background(void) {
 
 static UIColor *L77Panel(void) {
     return [UIColor colorWithRed:0.075 green:0.060 blue:0.110 alpha:0.95];
+}
+
+static UIColor *L77Border(void) {
+    return [UIColor colorWithWhite:0.5 alpha:0.25];
 }
 
 // ============ КАСТОМНЫЙ TOGGLE ============
@@ -47,7 +60,7 @@ static UIColor *L77Panel(void) {
         _indicator.translatesAutoresizingMaskIntoConstraints = NO;
         _indicator.layer.cornerRadius = 5;
         _indicator.layer.borderWidth = 1.5;
-        _indicator.layer.borderColor = [UIColor colorWithWhite:0.55 alpha:0.35].CGColor;
+        _indicator.layer.borderColor = L77Border().CGColor;
         
         _label = [UILabel new];
         _label.translatesAutoresizingMaskIntoConstraints = NO;
@@ -76,11 +89,11 @@ static UIColor *L77Panel(void) {
 
 - (void)toggle {
     self.on = !self.on;
-    AudioServicesPlaySystemSound(self.on ? 1103 : 1104);
+    PlayToggleSound(self.on);
     
     [UIView animateWithDuration:0.15 animations:^{
         self.indicator.backgroundColor = self.on ? L77Purple() : UIColor.clearColor;
-        self.indicator.layer.borderColor = (self.on ? L77LightPurple() : [UIColor colorWithWhite:0.55 alpha:0.35]).CGColor;
+        self.indicator.layer.borderColor = (self.on ? L77LightPurple() : L77Border()).CGColor;
         self.indicator.transform = CGAffineTransformMakeScale(0.85, 0.85);
     } completion:^(BOOL finished) {
         [UIView animateWithDuration:0.12 animations:^{
@@ -112,6 +125,7 @@ static UIColor *L77Panel(void) {
 @property(nonatomic,strong) UIButton *launcherButton;
 @property(nonatomic,assign) BOOL isDragging;
 @property(nonatomic,assign) CGPoint dragOffset;
+@property(nonatomic,assign) BOOL introShown;
 @end
 
 @implementation Lucky77OverlayView
@@ -120,13 +134,13 @@ static UIColor *L77Panel(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO; // По умолчанию не перехватываем касания
+        self.userInteractionEnabled = NO;
+        self.introShown = NO;
         
         [self buildLauncherButton];
         [self buildMenu];
         [self buildIntro];
         [self startFPS];
-        [self showIntro];
     }
     return self;
 }
@@ -155,10 +169,10 @@ static UIColor *L77Panel(void) {
     [self addSubview:self.launcherButton];
     
     [NSLayoutConstraint activateConstraints:@[
-        [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:10],
-        [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:10],
-        [self.launcherButton.widthAnchor constraintEqualToConstant:44],
-        [self.launcherButton.heightAnchor constraintEqualToConstant:44],
+        [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12],
+        [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:12],
+        [self.launcherButton.widthAnchor constraintEqualToConstant:48],
+        [self.launcherButton.heightAnchor constraintEqualToConstant:48],
     ]];
 }
 
@@ -183,7 +197,7 @@ static UIColor *L77Panel(void) {
     self.menu.backgroundColor = L77Background();
     self.menu.layer.cornerRadius = 18;
     self.menu.layer.borderWidth = 1;
-    self.menu.layer.borderColor = [UIColor colorWithWhite:0.5 alpha:0.25].CGColor;
+    self.menu.layer.borderColor = L77Border().CGColor;
     self.menu.clipsToBounds = YES;
     self.menu.hidden = YES;
     self.menu.userInteractionEnabled = YES;
@@ -193,8 +207,8 @@ static UIColor *L77Panel(void) {
     [NSLayoutConstraint activateConstraints:@[
         [self.menu.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
         [self.menu.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-        [self.menu.widthAnchor constraintEqualToConstant:320],
-        [self.menu.heightAnchor constraintEqualToConstant:390]
+        [self.menu.widthAnchor constraintEqualToConstant:340],
+        [self.menu.heightAnchor constraintEqualToConstant:420]
     ]];
     
     [self buildHeader];
@@ -211,43 +225,54 @@ static UIColor *L77Panel(void) {
     self.fpsLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.fpsLabel.text = @"60 FPS";
     self.fpsLabel.textColor = L77LightPurple();
-    self.fpsLabel.font = [UIFont monospacedDigitSystemFontOfSize:10 weight:UIFontWeightMedium];
+    self.fpsLabel.font = [UIFont monospacedDigitSystemFontOfSize:11 weight:UIFontWeightMedium];
     
     UILabel *title = [UILabel new];
     title.translatesAutoresizingMaskIntoConstraints = NO;
     title.text = @"Lucky77";
-    title.font = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
+    title.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
     title.textColor = UIColor.whiteColor;
+    
+    UILabel *logo = [UILabel new];
+    logo.translatesAutoresizingMaskIntoConstraints = NO;
+    logo.text = @"77";
+    logo.textColor = L77LightPurple();
+    logo.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBlack];
     
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     closeBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
     [closeBtn setTitleColor:L77LightPurple() forState:UIControlStateNormal];
-    closeBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    closeBtn.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
     [closeBtn addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     
     [header addSubview:self.fpsLabel];
     [header addSubview:title];
+    [header addSubview:logo];
     [header addSubview:closeBtn];
     
     UIView *divider = [UIView new];
     divider.translatesAutoresizingMaskIntoConstraints = NO;
-    divider.backgroundColor = [UIColor colorWithWhite:0.5 alpha:0.20];
+    divider.backgroundColor = L77Border();
     [self.menu addSubview:divider];
     
     [NSLayoutConstraint activateConstraints:@[
         [header.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor],
         [header.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor],
         [header.topAnchor constraintEqualToAnchor:self.menu.topAnchor],
-        [header.heightAnchor constraintEqualToConstant:45],
-        [self.fpsLabel.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:12],
+        [header.heightAnchor constraintEqualToConstant:50],
+        
+        [self.fpsLabel.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:14],
         [self.fpsLabel.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
-        [title.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+        [title.centerXAnchor constraintEqualToAnchor:header.centerXAnchor constant:-10],
         [title.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
-        [closeBtn.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-12],
+        [logo.leadingAnchor constraintEqualToAnchor:title.trailingAnchor constant:4],
+        [logo.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+        [closeBtn.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-14],
         [closeBtn.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
-        [closeBtn.widthAnchor constraintEqualToConstant:30],
-        [closeBtn.heightAnchor constraintEqualToConstant:30],
+        [closeBtn.widthAnchor constraintEqualToConstant:32],
+        [closeBtn.heightAnchor constraintEqualToConstant:32],
+        
         [divider.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor],
         [divider.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor],
         [divider.topAnchor constraintEqualToAnchor:header.bottomAnchor],
@@ -276,7 +301,7 @@ static UIColor *L77Panel(void) {
         button.tag = i;
         [button setTitle:titles[i] forState:UIControlStateNormal];
         [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-        button.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightSemibold];
+        button.titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
         button.layer.cornerRadius = 7;
         if (i == 0) {
             button.backgroundColor = [L77Purple() colorWithAlphaComponent:0.30];
@@ -302,17 +327,20 @@ static UIColor *L77Panel(void) {
     [self showTab:0];
     
     [NSLayoutConstraint activateConstraints:@[
-        [sidebar.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor constant:8],
-        [sidebar.topAnchor constraintEqualToAnchor:self.menu.topAnchor constant:54],
-        [sidebar.bottomAnchor constraintEqualToAnchor:self.menu.bottomAnchor constant:-8],
-        [sidebar.widthAnchor constraintEqualToConstant:78],
-        [self.navStack.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor constant:5],
-        [self.navStack.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:-5],
-        [self.navStack.topAnchor constraintEqualToAnchor:sidebar.topAnchor constant:8],
-        [scroll.leadingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:8],
-        [scroll.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor constant:-8],
+        [sidebar.leadingAnchor constraintEqualToAnchor:self.menu.leadingAnchor constant:10],
+        [sidebar.topAnchor constraintEqualToAnchor:self.menu.topAnchor constant:60],
+        [sidebar.bottomAnchor constraintEqualToAnchor:self.menu.bottomAnchor constant:-10],
+        [sidebar.widthAnchor constraintEqualToConstant:85],
+        
+        [self.navStack.leadingAnchor constraintEqualToAnchor:sidebar.leadingAnchor constant:6],
+        [self.navStack.trailingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:-6],
+        [self.navStack.topAnchor constraintEqualToAnchor:sidebar.topAnchor constant:10],
+        
+        [scroll.leadingAnchor constraintEqualToAnchor:sidebar.trailingAnchor constant:10],
+        [scroll.trailingAnchor constraintEqualToAnchor:self.menu.trailingAnchor constant:-10],
         [scroll.topAnchor constraintEqualToAnchor:sidebar.topAnchor],
         [scroll.bottomAnchor constraintEqualToAnchor:sidebar.bottomAnchor],
+        
         [self.contentStack.leadingAnchor constraintEqualToAnchor:scroll.leadingAnchor],
         [self.contentStack.trailingAnchor constraintEqualToAnchor:scroll.trailingAnchor],
         [self.contentStack.topAnchor constraintEqualToAnchor:scroll.topAnchor],
@@ -343,8 +371,9 @@ static UIColor *L77Panel(void) {
             @"ENABLE AIMBOT",
             @"TRIGGERBOT",
             @"SMOOTH AIM",
-            @"VISIBLE CHECK"
-        ] keys:@[@"aimbot", @"trigger", @"smooth", @"visible"]];
+            @"VISIBLE CHECK",
+            @"AIM FOV"
+        ] keys:@[@"aimbot", @"trigger", @"smooth", @"visible", @"fov"]];
     } else if (index == 1) {
         content = [self togglePanel:@[
             @"ESP BOX",
@@ -367,7 +396,7 @@ static UIColor *L77Panel(void) {
     panel.backgroundColor = L77Panel();
     panel.layer.cornerRadius = 10;
     panel.layer.borderWidth = 1;
-    panel.layer.borderColor = [UIColor colorWithWhite:0.50 alpha:0.25].CGColor;
+    panel.layer.borderColor = L77Border().CGColor;
     
     UIStackView *stack = [UIStackView new];
     stack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -381,10 +410,10 @@ static UIColor *L77Panel(void) {
     }
     
     [NSLayoutConstraint activateConstraints:@[
-        [stack.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:12],
-        [stack.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-12],
-        [stack.topAnchor constraintEqualToAnchor:panel.topAnchor constant:10],
-        [stack.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-10]
+        [stack.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:14],
+        [stack.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-14],
+        [stack.topAnchor constraintEqualToAnchor:panel.topAnchor constant:12],
+        [stack.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-12]
     ]];
     
     return panel;
@@ -395,6 +424,8 @@ static UIColor *L77Panel(void) {
     UIView *panel = [UIView new];
     panel.backgroundColor = L77Panel();
     panel.layer.cornerRadius = 10;
+    panel.layer.borderWidth = 1;
+    panel.layer.borderColor = L77Border().CGColor;
     
     UIStackView *stack = [UIStackView new];
     stack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -420,21 +451,24 @@ static UIColor *L77Panel(void) {
     [fpsSegment addTarget:self action:@selector(fpsLimitChanged:) forControlEvents:UIControlEventValueChanged];
     [stack addArrangedSubview:fpsSegment];
     
-    UILabel *developer = [UILabel new];
-    developer.text = @"@hack77ios";
-    developer.textAlignment = NSTextAlignmentCenter;
-    developer.textColor = L77LightPurple();
-    developer.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
-    developer.userInteractionEnabled = YES;
-    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(openTelegram)];
-    [developer addGestureRecognizer:tap];
-    [stack addArrangedSubview:developer];
+    UILabel *devLabel = [UILabel new];
+    devLabel.text = @"DEVELOPER";
+    devLabel.textColor = [UIColor colorWithWhite:0.75 alpha:1];
+    devLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    [stack addArrangedSubview:devLabel];
+    
+    UIButton *devBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [devBtn setTitle:@"@hack77ios" forState:UIControlStateNormal];
+    [devBtn setTitleColor:L77LightPurple() forState:UIControlStateNormal];
+    devBtn.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    [devBtn addTarget:self action:@selector(openTelegram) forControlEvents:UIControlEventTouchUpInside];
+    [stack addArrangedSubview:devBtn];
     
     [NSLayoutConstraint activateConstraints:@[
-        [stack.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:12],
-        [stack.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-12],
-        [stack.topAnchor constraintEqualToAnchor:panel.topAnchor constant:12],
-        [stack.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-12]
+        [stack.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor constant:14],
+        [stack.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor constant:-14],
+        [stack.topAnchor constraintEqualToAnchor:panel.topAnchor constant:14],
+        [stack.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:-14]
     ]];
     
     return panel;
@@ -453,7 +487,7 @@ static UIColor *L77Panel(void) {
     UILabel *logo = [UILabel new];
     logo.translatesAutoresizingMaskIntoConstraints = NO;
     logo.text = @"77";
-    logo.font = [UIFont systemFontOfSize:80 weight:UIFontWeightBlack];
+    logo.font = [UIFont systemFontOfSize:90 weight:UIFontWeightBlack];
     logo.textColor = L77LightPurple();
     logo.textAlignment = NSTextAlignmentCenter;
     logo.layer.shadowColor = L77LightPurple().CGColor;
@@ -463,26 +497,42 @@ static UIColor *L77Panel(void) {
     UILabel *title = [UILabel new];
     title.translatesAutoresizingMaskIntoConstraints = NO;
     title.text = @"Lucky77";
-    title.font = [UIFont systemFontOfSize:34 weight:UIFontWeightBold];
+    title.font = [UIFont systemFontOfSize:38 weight:UIFontWeightBold];
     title.textColor = UIColor.whiteColor;
     title.textAlignment = NSTextAlignmentCenter;
     
+    UILabel *version = [UILabel new];
+    version.translatesAutoresizingMaskIntoConstraints = NO;
+    version.text = @"v0.1";
+    version.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    version.textColor = [UIColor colorWithWhite:0.7 alpha:1];
+    version.textAlignment = NSTextAlignmentCenter;
+    
     [self.intro addSubview:logo];
     [self.intro addSubview:title];
+    [self.intro addSubview:version];
     
     [NSLayoutConstraint activateConstraints:@[
         [self.intro.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
         [self.intro.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
-        [self.intro.widthAnchor constraintEqualToConstant:280],
-        [self.intro.heightAnchor constraintEqualToConstant:250],
+        [self.intro.widthAnchor constraintEqualToConstant:300],
+        [self.intro.heightAnchor constraintEqualToConstant:280],
         [logo.centerXAnchor constraintEqualToAnchor:self.intro.centerXAnchor],
-        [logo.topAnchor constraintEqualToAnchor:self.intro.topAnchor constant:32],
+        [logo.topAnchor constraintEqualToAnchor:self.intro.topAnchor constant:35],
         [title.centerXAnchor constraintEqualToAnchor:self.intro.centerXAnchor],
-        [title.topAnchor constraintEqualToAnchor:logo.bottomAnchor constant:12]
+        [title.topAnchor constraintEqualToAnchor:logo.bottomAnchor constant:8],
+        [version.centerXAnchor constraintEqualToAnchor:self.intro.centerXAnchor],
+        [version.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:4]
     ]];
 }
 
-- (void)showIntro {
+- (void)showIntroWithCompletion:(void (^)(void))completion {
+    if (!gFirstOpen) {
+        if (completion) completion();
+        return;
+    }
+    
+    gFirstOpen = NO;
     self.intro.hidden = NO;
     self.intro.alpha = 0;
     self.intro.transform = CGAffineTransformMakeScale(0.5, 0.5);
@@ -491,12 +541,13 @@ static UIColor *L77Panel(void) {
         self.intro.alpha = 1;
         self.intro.transform = CGAffineTransformIdentity;
     } completion:^(BOOL finished) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.5 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.8 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
             [UIView animateWithDuration:0.6 animations:^{
                 self.intro.alpha = 0;
                 self.intro.transform = CGAffineTransformMakeScale(1.2, 1.2);
             } completion:^(BOOL finished2) {
                 self.intro.hidden = YES;
+                if (completion) completion();
             }];
         });
     }];
@@ -533,22 +584,24 @@ static UIColor *L77Panel(void) {
 // ============ УПРАВЛЕНИЕ МЕНЮ ============
 - (void)toggleMenu {
     if (self.menu.hidden) {
-        self.menu.hidden = NO;
-        self.menu.alpha = 0;
-        self.launcherButton.hidden = YES;
-        self.userInteractionEnabled = YES; // Включаем касания только когда меню открыто
-        
-        [UIView animateWithDuration:0.2 animations:^{
-            self.menu.alpha = 1;
+        [self showIntroWithCompletion:^{
+            self.menu.hidden = NO;
+            self.menu.alpha = 0;
+            self.launcherButton.hidden = YES;
+            self.userInteractionEnabled = YES;
+            
+            [UIView animateWithDuration:0.25 animations:^{
+                self.menu.alpha = 1;
+            }];
         }];
     } else {
-        [UIView animateWithDuration:0.15 animations:^{
+        [UIView animateWithDuration:0.18 animations:^{
             self.menu.alpha = 0;
         } completion:^(BOOL finished) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
             self.launcherButton.hidden = NO;
-            self.userInteractionEnabled = NO; // Отключаем касания когда меню закрыто
+            self.userInteractionEnabled = NO;
         }];
     }
 }
@@ -561,13 +614,13 @@ static UIColor *L77Panel(void) {
 @end
 
 // ============ ТОЧКА ВХОДА ============
-%ctor {
+__attribute__((constructor)) void init() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        // Создаём отдельное окно поверх всего
         UIWindow *overlayWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
         overlayWindow.backgroundColor = [UIColor clearColor];
-        overlayWindow.windowLevel = UIWindowLevelAlert + 1; // Поверх всего
-        overlayWindow.userInteractionEnabled = NO; // По умолчанию не перехватывает касания
+        overlayWindow.windowLevel = UIWindowLevelAlert + 1;
+        overlayWindow.userInteractionEnabled = NO;
+        overlayWindow.hidden = NO;
         
         Lucky77OverlayView *overlayView = [[Lucky77OverlayView alloc] initWithFrame:overlayWindow.bounds];
         overlayWindow.rootViewController = [UIViewController new];
