@@ -142,12 +142,7 @@ static UIColor *L77LightPurple(void) {
 @property(nonatomic,strong) CADisplayLink *displayLink;
 @property(nonatomic,assign) CFTimeInterval lastTimestamp;
 @property(nonatomic,assign) NSInteger frameCount;
-@property(nonatomic,strong) UIButton *launcherButton;
-@property(nonatomic,assign) BOOL isDragging;
-@property(nonatomic,assign) CGPoint dragOffset;
 @property(nonatomic,assign) BOOL introShown;
-@property(nonatomic,strong) NSLayoutConstraint *leadingConstraint;
-@property(nonatomic,strong) NSLayoutConstraint *topConstraint;
 @property(nonatomic,strong) NSLayoutConstraint *menuLeadingConstraint;
 @property(nonatomic,strong) NSLayoutConstraint *menuTopConstraint;
 @end
@@ -158,7 +153,7 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = NO;
+        self.userInteractionEnabled = YES; // ← ВСЕГДА ВКЛЮЧЕНЫ ДЛЯ ЖЕСТА
         self.introShown = NO;
         
         // ============ ЖЕСТ: ТРОЙНОЕ КАСАНИЕ ТРЕМЯ ПАЛЬЦАМИ ============
@@ -168,7 +163,6 @@ static UIColor *L77LightPurple(void) {
         tripleTap.cancelsTouchesInView = NO;
         [self addGestureRecognizer:tripleTap];
         
-        [self buildLauncherButton];
         [self buildMenu];
         [self buildIntro];
         [self startFPS];
@@ -185,74 +179,24 @@ static UIColor *L77LightPurple(void) {
     NSLog(@"[Lucky77] 🔥 Triple tap detected!");
     
     if (self.menu.hidden) {
-        self.userInteractionEnabled = YES;
+        // Открываем меню
         [self showIntroWithCompletion:^{
             self.menu.hidden = NO;
             self.menu.alpha = 0;
-            self.launcherButton.hidden = YES;
+            self.menu.userInteractionEnabled = YES; // ← Меню перехватывает касания
             [UIView animateWithDuration:0.25 animations:^{
                 self.menu.alpha = 1;
             }];
         }];
     } else {
+        // Закрываем меню
         [UIView animateWithDuration:0.18 animations:^{
             self.menu.alpha = 0;
         } completion:^(BOOL finished) {
             self.menu.hidden = YES;
             self.menu.alpha = 1;
-            self.launcherButton.hidden = NO;
-            self.userInteractionEnabled = NO;
+            self.menu.userInteractionEnabled = NO; // ← Меню НЕ перехватывает касания
         }];
-    }
-}
-
-// ============ КНОПКА-ЛАУНЧЕР ============
-- (void)buildLauncherButton {
-    self.launcherButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.launcherButton.translatesAutoresizingMaskIntoConstraints = NO;
-    self.launcherButton.backgroundColor = [L77Background() colorWithAlphaComponent:0.85];
-    self.launcherButton.layer.cornerRadius = 14;
-    self.launcherButton.layer.borderWidth = 1.5;
-    self.launcherButton.layer.borderColor = L77Purple().CGColor;
-    [self.launcherButton setTitle:@"⚡" forState:UIControlStateNormal];
-    [self.launcherButton setTitleColor:L77LightPurple() forState:UIControlStateNormal];
-    self.launcherButton.titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
-    self.launcherButton.userInteractionEnabled = YES;
-    self.launcherButton.hidden = NO;
-    [self.launcherButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
-    
-    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragLauncher:)];
-    [self.launcherButton addGestureRecognizer:pan];
-    
-    [self addSubview:self.launcherButton];
-    
-    self.leadingConstraint = [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12];
-    self.topConstraint = [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:12];
-    
-    [NSLayoutConstraint activateConstraints:@[
-        self.leadingConstraint,
-        self.topConstraint,
-        [self.launcherButton.widthAnchor constraintEqualToConstant:48],
-        [self.launcherButton.heightAnchor constraintEqualToConstant:48],
-    ]];
-    
-    [self bringSubviewToFront:self.launcherButton];
-}
-
-- (void)dragLauncher:(UIPanGestureRecognizer *)gesture {
-    if (gesture.state == UIGestureRecognizerStateBegan) {
-        self.isDragging = YES;
-    } else if (gesture.state == UIGestureRecognizerStateChanged) {
-        CGPoint translation = [gesture translationInView:self];
-        CGFloat newX = self.leadingConstraint.constant + translation.x;
-        CGFloat newY = self.topConstraint.constant + translation.y;
-        newX = MAX(0, MIN(newX, self.bounds.size.width - 60));
-        newY = MAX(0, MIN(newY, self.bounds.size.height - 60));
-        self.leadingConstraint.constant = newX;
-        self.topConstraint.constant = newY;
-        [gesture setTranslation:CGPointZero inView:self];
-    } else if (gesture.state == UIGestureRecognizerStateEnded) {
-        self.isDragging = NO;
     }
 }
 
@@ -266,7 +210,7 @@ static UIColor *L77LightPurple(void) {
     self.menu.layer.borderColor = L77Border().CGColor;
     self.menu.clipsToBounds = YES;
     self.menu.hidden = YES;
-    self.menu.userInteractionEnabled = YES;
+    self.menu.userInteractionEnabled = NO; // ← ПО УМОЛЧАНИЮ НЕ ПЕРЕХВАТЫВАЕТ
     
     [self addSubview:self.menu];
     
@@ -280,6 +224,7 @@ static UIColor *L77LightPurple(void) {
         [self.menu.heightAnchor constraintEqualToConstant:480]
     ]];
     
+    // Перетаскивание меню
     UIPanGestureRecognizer *dragMenu = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragMenu:)];
     [self.menu addGestureRecognizer:dragMenu];
     
@@ -289,7 +234,7 @@ static UIColor *L77LightPurple(void) {
 
 - (void)dragMenu:(UIPanGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateBegan) {
-        self.isDragging = YES;
+        // ничего
     } else if (gesture.state == UIGestureRecognizerStateChanged) {
         CGPoint translation = [gesture translationInView:self];
         CGFloat newX = self.menuLeadingConstraint.constant + translation.x;
@@ -299,8 +244,6 @@ static UIColor *L77LightPurple(void) {
         self.menuLeadingConstraint.constant = newX;
         self.menuTopConstraint.constant = newY;
         [gesture setTranslation:CGPointZero inView:self];
-    } else if (gesture.state == UIGestureRecognizerStateEnded) {
-        self.isDragging = NO;
     }
 }
 
@@ -333,7 +276,7 @@ static UIColor *L77LightPurple(void) {
     [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
     [closeBtn setTitleColor:L77LightPurple() forState:UIControlStateNormal];
     closeBtn.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
-    [closeBtn addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
+    [closeBtn addTarget:self action:@selector(closeMenu) forControlEvents:UIControlEventTouchUpInside];
     
     [header addSubview:self.fpsLabel];
     [header addSubview:title];
@@ -365,6 +308,18 @@ static UIColor *L77LightPurple(void) {
         [divider.topAnchor constraintEqualToAnchor:header.bottomAnchor],
         [divider.heightAnchor constraintEqualToConstant:1]
     ]];
+}
+
+- (void)closeMenu {
+    if (!self.menu.hidden) {
+        [UIView animateWithDuration:0.18 animations:^{
+            self.menu.alpha = 0;
+        } completion:^(BOOL finished) {
+            self.menu.hidden = YES;
+            self.menu.alpha = 1;
+            self.menu.userInteractionEnabled = NO;
+        }];
+    }
 }
 
 // ============ BODY ============
@@ -702,30 +657,6 @@ static UIColor *L77LightPurple(void) {
     self.displayLink.preferredFramesPerSecond = gFPSLimit;
 }
 
-// ============ УПРАВЛЕНИЕ МЕНЮ ============
-- (void)toggleMenu {
-    if (self.menu.hidden) {
-        self.userInteractionEnabled = YES;
-        [self showIntroWithCompletion:^{
-            self.menu.hidden = NO;
-            self.menu.alpha = 0;
-            self.launcherButton.hidden = YES;
-            [UIView animateWithDuration:0.25 animations:^{
-                self.menu.alpha = 1;
-            }];
-        }];
-    } else {
-        [UIView animateWithDuration:0.18 animations:^{
-            self.menu.alpha = 0;
-        } completion:^(BOOL finished) {
-            self.menu.hidden = YES;
-            self.menu.alpha = 1;
-            self.launcherButton.hidden = NO;
-            self.userInteractionEnabled = NO;
-        }];
-    }
-}
-
 - (void)openTelegram {
     NSURL *url = [NSURL URLWithString:@"https://t.me/hack77ios"];
     [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
@@ -743,7 +674,6 @@ static void ShowLucky77Overlay(UIWindow *targetWindow) {
     Lucky77OverlayView *overlay = [[Lucky77OverlayView alloc] initWithFrame:targetWindow.bounds];
     overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlay.backgroundColor = [UIColor clearColor];
-    overlay.userInteractionEnabled = NO;
     
     [targetWindow addSubview:overlay];
     [targetWindow bringSubviewToFront:overlay];
