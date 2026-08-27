@@ -145,6 +145,10 @@ static UIColor *L77LightPurple(void) {
 @property(nonatomic,assign) BOOL introShown;
 @property(nonatomic,strong) NSLayoutConstraint *menuLeadingConstraint;
 @property(nonatomic,strong) NSLayoutConstraint *menuTopConstraint;
+@property(nonatomic,strong) UIButton *launcherButton;
+@property(nonatomic,assign) BOOL isDragging;
+@property(nonatomic,strong) NSLayoutConstraint *leadingConstraint;
+@property(nonatomic,strong) NSLayoutConstraint *topConstraint;
 @end
 
 @implementation Lucky77OverlayView
@@ -153,16 +157,10 @@ static UIColor *L77LightPurple(void) {
     self = [super initWithFrame:frame];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.userInteractionEnabled = YES; // ← ВКЛЮЧАЕМ ДЛЯ ЖЕСТА
+        self.userInteractionEnabled = YES;
         self.introShown = NO;
         
-        // ============ УПРОЩЁННЫЙ ЖЕСТ ============
-        UITapGestureRecognizer *tripleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTripleTap:)];
-        tripleTap.numberOfTapsRequired = 1;      // ← ОДИН ТАП
-        tripleTap.numberOfTouchesRequired = 3;   // ← ТРЕМЯ ПАЛЬЦАМИ
-        tripleTap.cancelsTouchesInView = NO;
-        [self addGestureRecognizer:tripleTap];
-        
+        [self buildLauncherButton];
         [self buildMenu];
         [self buildIntro];
         [self startFPS];
@@ -170,52 +168,91 @@ static UIColor *L77LightPurple(void) {
     return self;
 }
 
-// ============ ПРОПУСК КАСАНИЙ СКВОЗЬ ОВЕРЛЕЙ ============
-- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
-    UIView *hit = [super hitTest:point withEvent:event];
-    
-    // Если меню скрыто и касание пришло на сам оверлей (не на дочерние элементы) — пропускаем
-    if (self.menu.hidden && (hit == self || hit == nil)) {
-        return nil;
-    }
-    
-    // Если меню открыто — проверяем, что касание внутри меню
-    if (!self.menu.hidden) {
-        CGPoint pointInMenu = [self convertPoint:point toView:self.menu];
-        if ([self.menu pointInside:pointInMenu withEvent:event]) {
-            return hit;
-        }
-        // Касание вне меню — пропускаем
-        return nil;
-    }
-    
-    return hit;
+- (void)dealloc {
+    [self.displayLink invalidate];
 }
 
-// ============ ОБРАБОТЧИК ЖЕСТА ============
-- (void)handleTripleTap:(UITapGestureRecognizer *)gesture {
-    NSLog(@"[Lucky77] 🔥 Triple tap detected!");
+// ============ КНОПКА-ЛАУНЧЕР ============
+- (void)buildLauncherButton {
+    self.launcherButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.launcherButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.launcherButton.backgroundColor = [L77Background() colorWithAlphaComponent:0.85];
+    self.launcherButton.layer.cornerRadius = 14;
+    self.launcherButton.layer.borderWidth = 1.5;
+    self.launcherButton.layer.borderColor = L77Purple().CGColor;
+    [self.launcherButton setTitle:@"⚡" forState:UIControlStateNormal];
+    [self.launcherButton setTitleColor:L77LightPurple() forState:UIControlStateNormal];
+    self.launcherButton.titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
+    self.launcherButton.userInteractionEnabled = YES;
+    self.launcherButton.hidden = NO;
+    [self.launcherButton addTarget:self action:@selector(toggleMenu) forControlEvents:UIControlEventTouchUpInside];
     
-    if (self.menu.hidden) {
-        // Открываем меню
-        [self showIntroWithCompletion:^{
-            self.menu.hidden = NO;
-            self.menu.alpha = 0;
-            self.menu.userInteractionEnabled = YES;
-            [UIView animateWithDuration:0.25 animations:^{
-                self.menu.alpha = 1;
-            }];
-        }];
-    } else {
-        // Закрываем меню
-        [UIView animateWithDuration:0.18 animations:^{
-            self.menu.alpha = 0;
-        } completion:^(BOOL finished) {
-            self.menu.hidden = YES;
-            self.menu.alpha = 1;
-            self.menu.userInteractionEnabled = NO;
-        }];
+    UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragLauncher:)];
+    pan.cancelsTouchesInView = NO;
+    pan.delaysTouchesBegan = NO;
+    pan.delaysTouchesEnded = NO;
+    [self.launcherButton addGestureRecognizer:pan];
+    
+    [self addSubview:self.launcherButton];
+    
+    self.leadingConstraint = [self.launcherButton.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:12];
+    self.topConstraint = [self.launcherButton.topAnchor constraintEqualToAnchor:self.topAnchor constant:12];
+    
+    [NSLayoutConstraint activateConstraints:@[
+        self.leadingConstraint,
+        self.topConstraint,
+        [self.launcherButton.widthAnchor constraintEqualToConstant:48],
+        [self.launcherButton.heightAnchor constraintEqualToConstant:48],
+    ]];
+    
+    [self bringSubviewToFront:self.launcherButton];
+}
+
+- (void)dragLauncher:(UIPanGestureRecognizer *)gesture {
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        self.isDragging = YES;
+    } else if (gesture.state == UIGestureRecognizerStateChanged) {
+        CGPoint translation = [gesture translationInView:self];
+        CGFloat buttonSize = 48.0;
+        CGFloat margin = 4.0;
+        CGFloat maxX = MAX(margin, CGRectGetWidth(self.bounds) - buttonSize - margin);
+        CGFloat maxY = MAX(margin, CGRectGetHeight(self.bounds) - buttonSize - margin);
+        CGFloat newX = self.leadingConstraint.constant + translation.x;
+        CGFloat newY = self.topConstraint.constant + translation.y;
+        newX = MAX(margin, MIN(newX, maxX));
+        newY = MAX(margin, MIN(newY, maxY));
+        self.leadingConstraint.constant = newX;
+        self.topConstraint.constant = newY;
+        [gesture setTranslation:CGPointZero inView:self];
+    } else if (gesture.state == UIGestureRecognizerStateEnded ||
+               gesture.state == UIGestureRecognizerStateCancelled ||
+               gesture.state == UIGestureRecognizerStateFailed) {
+        self.isDragging = NO;
     }
+}
+
+// ============ ПРОПУСК КАСАНИЙ ============
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+    // Кнопка-лаунчер
+    if (self.launcherButton &&
+        !self.launcherButton.hidden &&
+        self.launcherButton.alpha > 0.01) {
+        CGPoint launcherPoint = [self convertPoint:point toView:self.launcherButton];
+        if ([self.launcherButton pointInside:launcherPoint withEvent:event]) {
+            return [self.launcherButton hitTest:launcherPoint withEvent:event];
+        }
+    }
+    // Открытое меню
+    if (self.menu &&
+        !self.menu.hidden &&
+        self.menu.alpha > 0.01) {
+        CGPoint menuPoint = [self convertPoint:point toView:self.menu];
+        if ([self.menu pointInside:menuPoint withEvent:event]) {
+            return [self.menu hitTest:menuPoint withEvent:event];
+        }
+    }
+    // Остальные касания проходят сквозь overlay
+    return nil;
 }
 
 // ============ МЕНЮ ============
@@ -223,7 +260,7 @@ static UIColor *L77LightPurple(void) {
     self.menu = [UIView new];
     self.menu.translatesAutoresizingMaskIntoConstraints = NO;
     self.menu.backgroundColor = L77Background();
-    self.menu.layer.cornerRadius = 0;
+    self.menu.layer.cornerRadius = 16;
     self.menu.layer.borderWidth = 1;
     self.menu.layer.borderColor = L77Border().CGColor;
     self.menu.clipsToBounds = YES;
@@ -243,6 +280,7 @@ static UIColor *L77LightPurple(void) {
     ]];
     
     UIPanGestureRecognizer *dragMenu = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(dragMenu:)];
+    dragMenu.cancelsTouchesInView = NO;
     [self.menu addGestureRecognizer:dragMenu];
     
     [self buildHeader];
@@ -326,15 +364,21 @@ static UIColor *L77LightPurple(void) {
 }
 
 - (void)closeMenu {
-    if (!self.menu.hidden) {
-        [UIView animateWithDuration:0.18 animations:^{
-            self.menu.alpha = 0;
-        } completion:^(BOOL finished) {
-            self.menu.hidden = YES;
-            self.menu.alpha = 1;
-            self.menu.userInteractionEnabled = NO;
-        }];
+    if (self.menu.hidden) {
+        return;
     }
+    [UIView animateWithDuration:0.18 animations:^{
+        self.menu.alpha = 0.0;
+        self.menu.transform = CGAffineTransformMakeScale(0.96, 0.96);
+    } completion:^(BOOL finished) {
+        self.menu.hidden = YES;
+        self.menu.alpha = 1.0;
+        self.menu.transform = CGAffineTransformIdentity;
+        self.menu.userInteractionEnabled = NO;
+        self.launcherButton.hidden = NO;
+        self.launcherButton.userInteractionEnabled = YES;
+        [self bringSubviewToFront:self.launcherButton];
+    }];
 }
 
 // ============ BODY ============
@@ -361,7 +405,7 @@ static UIColor *L77LightPurple(void) {
         [button setTitle:titles[i] forState:UIControlStateNormal];
         [button setTitleColor:L77TextPrimary() forState:UIControlStateNormal];
         button.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
-        button.layer.cornerRadius = 0;
+        button.layer.cornerRadius = 8;
         if (i == 0) {
             button.backgroundColor = [L77Purple() colorWithAlphaComponent:0.30];
         }
@@ -450,7 +494,7 @@ static UIColor *L77LightPurple(void) {
 - (UIView *)togglePanel:(NSArray<NSString *> *)titles keys:(NSArray<NSString *> *)keys {
     UIView *panel = [UIView new];
     panel.backgroundColor = L77Panel();
-    panel.layer.cornerRadius = 0;
+    panel.layer.cornerRadius = 8;
     panel.layer.borderWidth = 1;
     panel.layer.borderColor = L77Border().CGColor;
     
@@ -479,7 +523,7 @@ static UIColor *L77LightPurple(void) {
 - (UIView *)settingsPanel {
     UIView *panel = [UIView new];
     panel.backgroundColor = L77Panel();
-    panel.layer.cornerRadius = 0;
+    panel.layer.cornerRadius = 8;
     panel.layer.borderWidth = 1;
     panel.layer.borderColor = L77Border().CGColor;
     
@@ -552,7 +596,7 @@ static UIColor *L77LightPurple(void) {
 }
 
 - (void)rebuildUI {
-    BOOL wasVisible = !self.menu.hidden; // ← ЗАПОМИНАЕМ СОСТОЯНИЕ
+    BOOL wasVisible = !self.menu.hidden;
     
     [self.menu removeFromSuperview];
     self.menu = nil;
@@ -575,7 +619,7 @@ static UIColor *L77LightPurple(void) {
     self.intro = [UIView new];
     self.intro.translatesAutoresizingMaskIntoConstraints = NO;
     self.intro.backgroundColor = L77Background();
-    self.intro.layer.cornerRadius = 0;
+    self.intro.layer.cornerRadius = 22;
     self.intro.hidden = YES;
     self.intro.userInteractionEnabled = NO;
     [self addSubview:self.intro];
@@ -675,6 +719,28 @@ static UIColor *L77LightPurple(void) {
     NSArray *values = @[@30, @60, @90, @120];
     gFPSLimit = [values[sender.selectedSegmentIndex] integerValue];
     self.displayLink.preferredFramesPerSecond = gFPSLimit;
+}
+
+// ============ УПРАВЛЕНИЕ МЕНЮ ============
+- (void)toggleMenu {
+    if (!self.menu.hidden) {
+        [self closeMenu];
+        return;
+    }
+    self.launcherButton.userInteractionEnabled = NO;
+    [self showIntroWithCompletion:^{
+        self.menu.hidden = NO;
+        self.menu.alpha = 0.0;
+        self.menu.userInteractionEnabled = YES;
+        self.menu.transform = CGAffineTransformMakeScale(0.94, 0.94);
+        self.launcherButton.hidden = YES;
+        [UIView animateWithDuration:0.25 animations:^{
+            self.menu.alpha = 1.0;
+            self.menu.transform = CGAffineTransformIdentity;
+        } completion:^(BOOL finished) {
+            self.launcherButton.userInteractionEnabled = YES;
+        }];
+    }];
 }
 
 - (void)openTelegram {
